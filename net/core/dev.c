@@ -1942,6 +1942,40 @@ static inline struct sk_buff *handle_macvlan(struct sk_buff *skb,
 #define handle_macvlan(skb, pt_prev, ret, orig_dev)	(skb)
 #endif
 
+/* Define switch handling hook */
+#if defined(CONFIG_SWITCH) || defined (CONFIG_SWITCH_MODULE)
+int (*sw_handle_frame_hook)(struct net_switch_port *, struct sk_buff **, int *);
+
+static __inline__ int handle_switch(struct sk_buff **pskb,
+				    struct packet_type **pt_prev, int *ret,
+					struct net_device *orig_dev)
+{
+	struct net_switch_port *port;
+
+	if ((*pskb)->pkt_type == PACKET_LOOPBACK ||
+	    (port = rcu_dereference((*pskb)->dev->sw_port)) == NULL) {
+		/* This packed is not meant for us, so let netif_receive_skb()
+		   call the other handlers.
+		 */
+		return 0;
+	}
+
+	/* If there is a handler left from the list traversal (the
+	   handler list was not empty), call the handler here because
+	   we'll exit from netif_receive_skb() upon return from
+	   handle_switch().
+	 */
+	if (*pt_prev) {
+		*ret = deliver_skb(*pskb, *pt_prev, orig_dev);
+		*pt_prev = NULL;
+	}
+	
+	return sw_handle_frame_hook(port, pskb, ret);
+}
+#else
+#define handle_switch(skb, pt_prev, ret, orig_dev)	(0)
+#endif
+
 #ifdef CONFIG_NET_CLS_ACT
 /* TODO: Maybe we should just force sch_ingress to be compiled in
  * when CONFIG_NET_CLS_ACT is? otherwise some useless instructions
@@ -2058,6 +2092,15 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 #endif
 
+	/* Generic packet handlers are called here. The list traversal uses
+	   "post-processing" of elements (that is we process the previous
+	   element i.e. pt_prev) at each step because the usage count on the
+	   skb must be increased for only n-1 elements (where n is the element
+	   count in the list).
+
+	   Each halder is responsible for releasing the skb, but if we have
+	   no handlers, we'll eventually free the skb ourselves.
+	 */
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev)
@@ -2080,6 +2123,13 @@ ncls:
 	if (!skb)
 		goto out;
 
+	if (handle_switch(&skb, &pt_prev, &ret, orig_dev))
+		goto out;
+
+	/* Protocol-specific handlers are called here. This list is also
+	   traversed unsing post-processing of elements. Note that we might
+	   have a "previous element" left from the generic handlers list.
+	 */
 	type = skb->protocol;
 	list_for_each_entry_rcu(ptype,
 			&ptype_base[ntohs(type) & PTYPE_HASH_MASK], list) {
@@ -2094,6 +2144,7 @@ ncls:
 	if (pt_prev) {
 		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
+		/* It looks like we had no handlers. We have to free the skb. */
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)
@@ -4588,6 +4639,10 @@ EXPORT_SYMBOL(dev_get_flags);
 EXPORT_SYMBOL(br_handle_frame_hook);
 EXPORT_SYMBOL(br_fdb_get_hook);
 EXPORT_SYMBOL(br_fdb_put_hook);
+#endif
+
+#if defined(CONFIG_SWITCH) || defined (CONFIG_SWITCH_MODULE)
+EXPORT_SYMBOL(sw_handle_frame_hook);
 #endif
 
 #ifdef CONFIG_KMOD

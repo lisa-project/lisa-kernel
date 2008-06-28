@@ -718,6 +718,15 @@ struct net_device
 	/* macvlan */
 	struct macvlan_port	*macvlan_port;
 
+ 	/* Switch port pointer
+ 
+ 	   This will be initialized to NULL since the whole structure is
+ 	   filled with 0.
+ 
+ 	   We change this pointer when an interface is added to the switch. 
+ 	 */
+ 	struct net_switch_port	*sw_port;
+ 
 	/* class/net/name entry */
 	struct device		dev;
 	/* space for optional statistics and wireless sysfs groups */

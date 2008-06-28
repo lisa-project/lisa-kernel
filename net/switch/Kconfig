@@ -1,0 +1,11 @@
+#
+# Linux Multilayer Switch
+#
+
+config SWITCH
+	tristate "Linux Multilayer Switch"
+	---help---
+	  This is the help section.
+	  
+	  If unsure, say N.
+
