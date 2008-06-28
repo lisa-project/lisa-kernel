@@ -3191,6 +3191,41 @@ int (*br_fdb_test_addr_hook)(struct net_device *dev,
 EXPORT_SYMBOL_GPL(br_fdb_test_addr_hook);
 #endif
 
+/* Define switch handling hook */
+#if defined(CONFIG_SWITCH) || defined (CONFIG_SWITCH_MODULE)
+int (*sw_handle_frame_hook)(struct net_switch_port *, struct sk_buff **, int *);
+EXPORT_SYMBOL_GPL(sw_handle_frame_hook);
+
+static __inline__ int handle_switch(struct sk_buff **pskb,
+				    struct packet_type **pt_prev, int *ret,
+					struct net_device *orig_dev)
+{
+	struct net_switch_port *port;
+
+	if ((*pskb)->pkt_type == PACKET_LOOPBACK ||
+	    (port = rcu_dereference((*pskb)->dev->sw_port)) == NULL) {
+		/* This packed is not meant for us, so let netif_receive_skb()
+		   call the other handlers.
+		 */
+		return 0;
+	}
+
+	/* If there is a handler left from the list traversal (the
+	   handler list was not empty), call the handler here because
+	   we'll exit from netif_receive_skb() upon return from
+	   handle_switch().
+	 */
+	if (*pt_prev) {
+		*ret = deliver_skb(*pskb, *pt_prev, orig_dev);
+		*pt_prev = NULL;
+	}
+	
+	return sw_handle_frame_hook(port, pskb, ret);
+}
+#else
+#define handle_switch(skb, pt_prev, ret, orig_dev)	(0)
+#endif
+
 #ifdef CONFIG_NET_CLS_ACT
 /* TODO: Maybe we should just force sch_ingress to be compiled in
  * when CONFIG_NET_CLS_ACT is? otherwise some useless instructions
@@ -3380,6 +3415,15 @@ another_round:
 	if (sk_memalloc_socks() && skb_pfmemalloc(skb))
 		goto skip_taps;
 
+	/* Generic packet handlers are called here. The list traversal uses
+	   "post-processing" of elements (that is we process the previous
+	   element i.e. pt_prev) at each step because the usage count on the
+	   skb must be increased for only n-1 elements (where n is the element
+	   count in the list).
+
+	   Each halder is responsible for releasing the skb, but if we have
+	   no handlers, we'll eventually free the skb ourselves.
+	 */
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev)
@@ -3437,6 +3481,13 @@ ncls:
 	/* deliver only exact match when indicated */
 	null_or_dev = deliver_exact ? skb->dev : NULL;
 
+	if (handle_switch(&skb, &pt_prev, &ret, orig_dev))
+		goto out;
+
+	/* Protocol-specific handlers are called here. This list is also
+	   traversed unsing post-processing of elements. Note that we might
+	   have a "previous element" left from the generic handlers list.
+	 */
 	type = skb->protocol;
 	list_for_each_entry_rcu(ptype,
 			&ptype_base[ntohs(type) & PTYPE_HASH_MASK], list) {
@@ -3456,6 +3507,7 @@ ncls:
 			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
 drop:
+		/* It looks like we had no handlers. We have to free the skb. */
 		atomic_long_inc(&skb->dev->rx_dropped);
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
@@ -6857,4 +6909,3 @@ static int __init initialize_hashrnd(void)
 }
 
 late_initcall_sync(initialize_hashrnd);
-
