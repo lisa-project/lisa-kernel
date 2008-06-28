@@ -125,6 +125,9 @@
 /* hardware time stamping: parameters in linux/net_tstamp.h */
 #define SIOCSHWTSTAMP   0x89b0
 
+/* switch calls */
+#define SIOCSWCFG	0x89c0
+
 /* Device private ioctl calls */
 
 /*
