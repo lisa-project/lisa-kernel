@@ -231,7 +231,7 @@ extern void cleanup_switch_proc(void);
 
 /* sw_ioctl.c */
 extern int sw_delif(struct net_device *);
-extern int sw_deviceless_ioctl(unsigned int, void __user *);
+extern int sw_deviceless_ioctl(struct socket *, unsigned int, void __user *);
 extern void dump_mem(void *, int);
 
 #define VLAN_TAG_BYTES 4

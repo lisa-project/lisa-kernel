@@ -25,9 +25,7 @@ void sw_fdb_init(struct net_switch *sw) {
 		INIT_LIST_HEAD(&sw->fdb[i].entries);
 		spin_lock_init(&sw->fdb[i].lock);
 	}
-	sw->fdb_cache = kmem_cache_create("sw_fdb_cache",
-		sizeof(struct net_switch_fdb_entry),
-		0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+	sw->fdb_cache = KMEM_CACHE(net_switch_fdb_entry, SLAB_HWCACHE_ALIGN);
 		
 	dbg("Initialized hash of %d buckets\n", SW_HASH_SIZE);	
 }

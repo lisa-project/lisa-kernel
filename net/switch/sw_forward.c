@@ -23,8 +23,9 @@ __dbg_static inline void add_vlan_tag(struct sk_buff *skb, int vlan) {
 	
 	dbg("%s: head=%p data=%p mac.raw=%p nh.raw=%p h.raw=%p csum=%x "
 			"csum_start=%x csum_offset=%x ip_summed=%d\n",
-			__func__, skb->head, skb->data, skb->mac.raw, skb->nh.raw,
-			skb->h.raw, skb->csum, skb->csum_start, skb->csum_offset,
+			__func__, skb->head, skb->data, skb_mac_header(skb),
+			skb_network_header(skb), skb_transport_header(skb),
+			skb->csum, skb->csum_start, skb->csum_offset,
 			(int)skb->ip_summed);
 	/* If we don't have enough headroom, we make some :D */
 	/* FIXME daca nu avem destul headroom, poate avem destul tailroom
@@ -38,15 +39,19 @@ __dbg_static inline void add_vlan_tag(struct sk_buff *skb, int vlan) {
 		dbg("add_vlan_tag(after expand): skb=0x%p skb headroom: %d (head=0x%p data=0x%p)\n",
 			skb, skb->data - skb->head, skb->head, skb->data);
 	}
-	memmove(skb->mac.raw-VLAN_TAG_BYTES, skb->mac.raw, 2 * ETH_ALEN);	
-	skb->mac.raw -= VLAN_TAG_BYTES;
+	memmove(skb_mac_header(skb)-VLAN_TAG_BYTES, skb_mac_header(skb), 2 * ETH_ALEN);
+	skb->mac_header -= VLAN_TAG_BYTES;
+	/* adding to or subtracting from skb->mac_header should work the same
+	   with both offset and pointer skb storage implementations */
 	skb_push(skb, VLAN_TAG_BYTES);
-	skb->nh.raw = skb->data;
-	/* skb->h.raw doesn't need to be set here, because it's properly
-	 * set later in dev_queue_xmit()
-	 */
+	skb_reset_network_header(skb);
+	/* FIXME: old comment says "skb->h.raw doesn't need to be set here,
+	   because it's properly set later in dev_queue_xmit(), but now we
+	   cannot find any change on skb->transport_header in dev_queue_xmit()
+	   unless skb->ip_summed == CHECKSUM_PARTIAL (where the transport
+	   header is explicitly set) */
 	*(short *)skb->data = htons((short)vlan);
-	*(short *)(skb->mac.raw + ETH_HLEN - 2) = htons(ETH_P_8021Q);
+	*(short *)(skb_mac_header(skb) + ETH_HLEN - 2) = htons(ETH_P_8021Q);
 #ifdef CONFIG_XEN
 	/* This is pretty obscure :) First of all, unless we have xen,
 	 * ip_summed is either CHECKSUM_NONE or CHECKSUM_COMPLETE
@@ -66,22 +71,24 @@ __dbg_static inline void add_vlan_tag(struct sk_buff *skb, int vlan) {
 	if (skb->ip_summed == CHECKSUM_PARTIAL && skb->protocol == htons(ETH_P_IP)) {
 		dbg("%s: fixing ip checksum (muie xen)\n", __func__);
 		skb->csum_start -= ETH_HLEN;
-		skb->h.raw = skb->head + skb->csum_start;
+		/* skb->h.raw = skb->head + skb->csum_start; */
+		skb_set_transport_header(skb->csum_start - skb_headroom(skb));
 		skb_checksum_help(skb);
 		/* skb_checksum_help() sets skb->ip_summed to CHECKSUM_NONE */
 		skb->csum = 0;
 	}
 #endif
 	dbg("%s: head=%p data=%p mac.raw=%p nh.raw=%p h.raw=%p csum=%x\n",
-			__func__, skb->head, skb->data, skb->mac.raw, skb->nh.raw,
-			skb->h.raw, skb->csum);
+			__func__, skb->head, skb->data, skb_mac_header(skb),
+			skb_network_header(skb), skb_transport_header(skb),
+			skb->csum);
 }
 
 __dbg_static inline void strip_vlan_tag(struct sk_buff *skb) {
-	memmove(skb->mac.raw+VLAN_TAG_BYTES, skb->mac.raw, 2 * ETH_ALEN);
-	skb->mac.raw+=VLAN_TAG_BYTES;
+	memmove(skb_mac_header(skb)+VLAN_TAG_BYTES, skb_mac_header(skb), 2 * ETH_ALEN);
+	skb->mac_header += VLAN_TAG_BYTES;
 	skb_pull(skb, VLAN_TAG_BYTES);
-	skb->protocol = *(short *)(skb->mac.raw + ETH_HLEN - 2);
+	skb->protocol = *(short *)(skb_mac_header(skb) + ETH_HLEN - 2);
 }
 
 __dbg_static inline void __strip_vlan_tag(struct sk_buff *skb, int vlan) {
@@ -303,7 +310,7 @@ __dbg_static int __sw_multicast(struct net_switch *sw, struct net_switch_port *i
 		if (entry->vlan != vlan)
 			continue;
 		if (entry->port == in) continue;
-		if (memcmp(entry->mac, skb->mac.raw, ETH_ALEN))
+		if (memcmp(entry->mac, skb_mac_header(skb), ETH_ALEN))
 			continue;
 		/* In __sw_flood we use the vdb, so we know for sure that 'vlan' is
 		   allowed on the output port. But here we walk the fdb, so we need
@@ -329,7 +336,7 @@ __dbg_static int __sw_multicast(struct net_switch *sw, struct net_switch_port *i
 		if (entry->vlan != vlan)
 			continue;
 		if (entry->port == in) continue;
-		if (memcmp(entry->mac, skb->mac.raw, ETH_ALEN))
+		if (memcmp(entry->mac, skb_mac_header(skb), ETH_ALEN))
 			continue;
 		if ((first_trunkness && sw_port_forbidden_vlan(entry->port, vlan)) ||
 				(!first_trunkness && entry->port->vlan != vlan))
@@ -426,10 +433,10 @@ int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e) {
 	struct net_device *dev;
 	int vlan;
 
-	if(memcmp(skb->mac.raw, vif_mac, ETH_ALEN - 2))
+	if(memcmp(skb_mac_header(skb), vif_mac, ETH_ALEN - 2))
 		return 0;
-	vlan = (vif_mac[ETH_ALEN - 2] ^ skb->mac.raw[ETH_ALEN - 2]) * 0x100 +
-		(vif_mac[ETH_ALEN - 1] ^ skb->mac.raw[ETH_ALEN - 1]);
+	vlan = (vif_mac[ETH_ALEN - 2] ^ skb_mac_header(skb)[ETH_ALEN - 2]) * 0x100 +
+		(vif_mac[ETH_ALEN - 1] ^ skb_mac_header(skb)[ETH_ALEN - 1]);
 	if(vlan == skb_e->vlan && (dev = sw_vif_find(sw, vlan))) {
 		if(skb_e->has_vlan_tag) {
 			sw_skb_unshare(&skb);
@@ -447,7 +454,7 @@ int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e) {
 int sw_forward(struct net_switch_port *in,
 		struct sk_buff *skb, struct skb_extra *skb_e) {
 	struct net_switch *sw = in->sw;
-	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(skb->mac.raw)];
+	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(skb_mac_header(skb))];
 	struct net_switch_fdb_entry *out;
 	int ret = 1;
 
@@ -455,7 +462,7 @@ int sw_forward(struct net_switch_port *in,
 	if (sw_vif_forward(skb, skb_e))
 		return ret;
 	rcu_read_lock();
-	if (is_mcast_mac(skb->mac.raw)) {
+	if (is_mcast_mac(skb_mac_header(skb))) {
 		ret = __sw_multicast(sw, in, skb, skb_e->vlan,
 				in->flags & SW_PFL_TRUNK ? __strip_vlan_tag : add_vlan_tag,
 				&bucket->entries, in->flags & SW_PFL_TRUNK);
@@ -465,7 +472,7 @@ int sw_forward(struct net_switch_port *in,
 		ret = sw_flood(sw, in, skb, skb_e->vlan);
 		return ret;
 	}
-	if (fdb_lookup(bucket, skb->mac.raw, skb_e->vlan, &out)) {
+	if (fdb_lookup(bucket, skb_mac_header(skb), skb_e->vlan, &out)) {
 		/* fdb entry found */
 		rcu_read_unlock();
 		if (in == out->port) {
