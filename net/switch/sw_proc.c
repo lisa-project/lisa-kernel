@@ -188,7 +188,7 @@ static int proc_read_vif(char *page, char **start,
 int init_switch_proc(void) {
 
 	/* Create our own directory under /proc/net */
-	switch_dir = proc_mkdir(SW_PROCFS_DIR, proc_net);
+	switch_dir = proc_mkdir(SW_PROCFS_DIR, proc_root_fs);
 	if (!switch_dir)
 		return -ENOMEM;
 
@@ -201,7 +201,7 @@ int init_switch_proc(void) {
 	iface_file = create_proc_read_entry(SW_PROCFS_IFACES, 0644,
 			switch_dir, proc_read_ifaces, NULL);
 	if (!iface_file) {
-		remove_proc_entry(SW_PROCFS_DIR, proc_net);
+		remove_proc_entry(SW_PROCFS_DIR, proc_root_fs);
 		return -ENOMEM;
 	}
 	iface_file->owner = THIS_MODULE;
@@ -210,7 +210,7 @@ int init_switch_proc(void) {
 			switch_dir, proc_read_mac, NULL);
 	if (!mac_file) {
 		remove_proc_entry(SW_PROCFS_IFACES, switch_dir);
-		remove_proc_entry(SW_PROCFS_DIR, proc_net);
+		remove_proc_entry(SW_PROCFS_DIR, proc_root_fs);
 		return -ENOMEM;
 	}
 	mac_file->owner = THIS_MODULE;
@@ -220,7 +220,7 @@ int init_switch_proc(void) {
 	if (!vlan_file) {
 		remove_proc_entry(SW_PROCFS_IFACES, switch_dir);
 		remove_proc_entry(SW_PROCFS_MAC, switch_dir);
-		remove_proc_entry(SW_PROCFS_DIR, proc_net);
+		remove_proc_entry(SW_PROCFS_DIR, proc_root_fs);
 		return -ENOMEM;
 	}
 	vlan_file->owner = THIS_MODULE;
@@ -231,7 +231,7 @@ int init_switch_proc(void) {
 		remove_proc_entry(SW_PROCFS_IFACES, switch_dir);
 		remove_proc_entry(SW_PROCFS_MAC, switch_dir);
 		remove_proc_entry(SW_PROCFS_VLAN, switch_dir);
-		remove_proc_entry(SW_PROCFS_DIR, proc_net);
+		remove_proc_entry(SW_PROCFS_DIR, proc_root_fs);
 	}
 
 	dbg("sw_proc initialized\n");
@@ -243,5 +243,5 @@ void cleanup_switch_proc(void) {
 	remove_proc_entry(SW_PROCFS_MAC, switch_dir);
 	remove_proc_entry(SW_PROCFS_VLAN, switch_dir);
 	remove_proc_entry(SW_PROCFS_VIF, switch_dir);
-	remove_proc_entry(SW_PROCFS_DIR, proc_net);
+	remove_proc_entry(SW_PROCFS_DIR, proc_root_fs);
 }
