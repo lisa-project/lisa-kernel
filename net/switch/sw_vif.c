@@ -46,7 +46,7 @@ int sw_vif_hard_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 
 	skb_e.vlan = priv->bogo_port.vlan;
 	skb_e.has_vlan_tag = 0;
-	skb->mac.raw = skb->data;
+	skb_reset_mac_header(skb);
 	skb->mac_len = ETH_HLEN;
 	skb->dev = dev;
 	skb_pull(skb, ETH_HLEN);

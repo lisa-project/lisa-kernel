@@ -45,11 +45,11 @@ void dump_packet(const struct sk_buff *skb) {
 			"head=0x%p data=0x%p tail=0x%p end=0x%p mac=0x%p\n",
 			skb->dev->name, ntohs(skb->protocol), skb->mac_len,
 			skb->len,
-			skb->head, skb->data, skb->tail, skb->end, skb->mac.raw);
+			skb->head, skb->data, skb->tail, skb->end, skb_mac_header(skb));
 	printk("MAC dump: ");
-	if(skb->mac.raw)
+	if(skb_mac_header_was_set(skb))
 		for(i = 0; i < skb->mac_len; i++)
-			printk("0x%x ", skb->mac.raw[i]);
+			printk("0x%x ", skb_mac_header(skb)[i]);
 	printk("\nDATA dump: ");
 	if(skb->data)
 		for(i = 0; i < 4; i++)
@@ -179,19 +179,19 @@ __dbg_static int sw_handle_frame(struct net_switch_port *port,
 	}
 
 	/* Perform some sanity checks on source mac */
-	if(is_null_mac(skb->mac.raw + 6)) {
+	if(is_null_mac(skb_mac_header(skb) + 6)) {
 		dbg("Received null-smac packet on %s\n", port->dev->name);
 		goto free_skb;
 	}
 
-	if(is_bcast_mac(skb->mac.raw + 6)) {
+	if(is_bcast_mac(skb_mac_header(skb) + 6)) {
 		dbg("Received bcast-smac packet on %s\n", port->dev->name);
 		goto free_skb;
 	}
 
 
 	/* Update the fdb */
-	fdb_learn(skb->mac.raw + 6, port, skb_e.vlan, SW_FDB_DYN, 0);
+	fdb_learn(skb_mac_header(skb) + 6, port, skb_e.vlan, SW_FDB_DYN, 0);
 
 	sw_forward(port, skb, &skb_e);
 	*ret = NET_RX_SUCCESS;

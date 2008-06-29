@@ -42,9 +42,7 @@ DEFINE_MUTEX(sw_ioctl_mutex);
 #define ETH_HDLC_CDP 0x2000
 #define ETH_HDLC_VTP 0x2004
 
-
-/* FIXME: shouldn't this be moved to a header file? (or we consider it private and leave it here)?
- * Custom structure that wraps the kernel "sock" struct. We use it to be
+/* Custom structure that wraps the kernel "sock" struct. We use it to be
  * able to add implementation-specific data to the socket structure.
  */
 struct switch_sock {
@@ -57,6 +55,10 @@ struct switch_sock {
 	struct list_head		port_chain;		/* link to port list of sockets */
 	struct net_switch_port	*port;			/* required for sendmsg() */
 };
+
+static inline struct switch_sock *sw_sk(struct sock *sk) {
+	return (struct switch_sock *)sk;
+}
 
 /* Enqueue a sk_buff to a socket receive queue.
  */
@@ -72,11 +74,11 @@ static int sw_socket_enqueue(struct sk_buff *skb, struct net_device *dev, struct
 			(unsigned)sk->sk_rcvbuf)
 		goto skb_unhandled;
 
-	if (dev->hard_header) {
+	if (dev->header_ops) {
 		if (sk->sk_type != SOCK_DGRAM)
-			skb_push(skb, skb->data - skb->mac.raw);
+			skb_push(skb, skb->data - skb_mac_header(skb));
 		else if (skb->pkt_type == PACKET_OUTGOING)
-			skb_pull(skb, skb->nh.raw - skb->data);
+			skb_pull(skb, skb_network_offset(skb));
 	}
 
 	/* clone the skb if others we're sharing it with others  */
@@ -143,7 +145,7 @@ int sw_socket_filter(struct sk_buff *skb, struct net_switch_port *port) {
 #endif
 	
 	/* Both CDP and VTP frames are sent to a specific multicast address */
-	if(memcmp(cdp_vtp_dst, skb->mac.raw, sizeof(cdp_vtp_dst)))
+	if(memcmp(cdp_vtp_dst, skb_mac_header(skb), sizeof(cdp_vtp_dst)))
 		goto out;
 
 	/* Check for HDLC protocol type (offset 6 within LLC field) */
@@ -170,10 +172,6 @@ out:
 	return handled;
 }
 
-static inline struct switch_sock *sw_sk(struct sock *sk) {
-	return (struct switch_sock *)sk;
-}
-
 /* Almost copy-paste from af_packet.c */
 static void sw_sock_destruct(struct sock *sk) {
 	dbg("sw_sock_destruct, sk=%p\n", sk);
@@ -194,7 +192,7 @@ static struct proto switch_proto = {
 
 static const struct proto_ops sw_sock_ops;
 
-static int sw_sock_create(struct socket *sock, int protocol) {
+static int sw_sock_create(struct net *net, struct socket *sock, int protocol) {
 	struct sock *sk;
 	struct switch_sock *sws;
 
@@ -208,7 +206,7 @@ static int sw_sock_create(struct socket *sock, int protocol) {
 
 	sock->state = SS_UNCONNECTED;
 
-	sk = sk_alloc(PF_SWITCH, GFP_KERNEL, &switch_proto, 1);
+	sk = sk_alloc(net, PF_SWITCH, GFP_KERNEL, &switch_proto);
 	if(sk == NULL)
 		return -ENOBUFS;
 
@@ -289,7 +287,7 @@ static int sw_sock_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	if(sw_addr->ssw_family != AF_SWITCH)
 		return -EINVAL;
 
-	dev = dev_get_by_name(sw_addr->ssw_if_name);
+	dev = dev_get_by_name(sock->sk->sk_net, sw_addr->ssw_if_name);
 	if(dev == NULL)
 		return -ENODEV;
 
@@ -327,7 +325,7 @@ static int sw_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	void __user *argp = (void __user *)arg;
 
 	mutex_lock(&sw_ioctl_mutex);
-	err = sw_deviceless_ioctl(cmd, argp);
+	err = sw_deviceless_ioctl(sock, cmd, argp);
 	mutex_unlock(&sw_ioctl_mutex);
 	return err;
 }
@@ -363,7 +361,7 @@ static int sw_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 		if (msg->msg_namelen == sizeof(struct sockaddr_sw))
 			proto = sw_addr->ssw_proto;
 
-		dev = dev_get_by_name(sw_addr->ssw_if_name);
+		dev = dev_get_by_name(sock->sk->sk_net, sw_addr->ssw_if_name);
 		if (dev == NULL)
 			return -ENODEV;
 	}
@@ -391,14 +389,14 @@ static int sw_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	/* Save space for drivers that write hard header at Tx time (implement
 	   the hard_header method)*/
 	skb_reserve(skb, LL_RESERVED_SPACE(dev));
-	skb->nh.raw = skb->data;
+	skb_reset_network_header(skb);
 
 	/* Align data correctly */
-	if (dev->hard_header) {
+	if (dev->header_ops) {
 		skb->data -= dev->hard_header_len;
 		skb->tail -= dev->hard_header_len;
 		if (len < dev->hard_header_len)
-			skb->nh.raw = skb->data;
+			skb_reset_network_header(skb);
 	}
 
 	/* Copy data from msg */

@@ -15,6 +15,8 @@
  *    along with Linux Multilayer Switch; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <net/sock.h>
+
 #include "sw_private.h"
 
 inline void dump_mem(void *m, int len) {
@@ -526,7 +528,7 @@ int sw_get_vdb(struct net_switch_ioctl_arg *arg) {
 		break;\
 	}\
 	if_name[IFNAMSIZ - 1] = '\0';\
-	if((dev = dev_get_by_name(if_name)) == NULL) {\
+	if((dev = dev_get_by_name(net, if_name)) == NULL) {\
 		err = -ENODEV;\
 		break;\
 	}\
@@ -545,7 +547,7 @@ int sw_get_vdb(struct net_switch_ioctl_arg *arg) {
 /* Handle "deviceless" ioctls. These ioctls are not specific to a certain
    device; they control the switching engine as a whole.
  */
-int sw_deviceless_ioctl(unsigned int cmd, void __user *uarg) {
+int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg) {
 	struct net_device *dev = NULL;
 	struct net_switch_port *port = NULL;
 	struct net_switch_ioctl_arg arg;
@@ -555,6 +557,7 @@ int sw_deviceless_ioctl(unsigned int cmd, void __user *uarg) {
 	int do_put = 0;
 	unsigned long age_time;
 	char vlan_desc[SW_MAX_VLAN_NAME+1];
+	struct net *net = sock->sk->sk_net;
 
 	if(!capable(CAP_NET_ADMIN))
 		return -EPERM;
