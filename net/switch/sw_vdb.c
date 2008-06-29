@@ -153,9 +153,7 @@ int sw_vdb_set_vlan_name(struct net_switch *sw, int vlan, char *name) {
 /* Initialize the vlan database */
 void sw_vdb_init(struct net_switch *sw) {
 	memset(&sw->vdb, 0, sizeof(sw->vdb));
-	sw->vdb_cache = kmem_cache_create("sw_vdb_cache",
-			sizeof(struct net_switch_vdb_link),
-			0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+	sw->vdb_cache = KMEM_CACHE(net_switch_vdb_link, SLAB_HWCACHE_ALIGN);
 	if(!sw->vdb_cache)
 		return;
     sw_vdb_add_vlan(sw, 1, "default");
