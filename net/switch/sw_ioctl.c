@@ -106,7 +106,9 @@ static int sw_addif(struct net_device *dev) {
 	list_add_tail_rcu(&port->lh, &sw.ports);
 	rcu_assign_pointer(dev->sw_port, port);
 	dev_hold(dev);
+	rtnl_lock();
 	dev_set_promiscuity(dev, 1);
+	rtnl_unlock();
 	sw_enable_port(port);
 	dbg("Added device %s to switch\n", dev->name);
 	return 0;
@@ -125,7 +127,10 @@ int sw_delif(struct net_device *dev) {
 	/* First disable promiscuous mode, so that there be less chances to
 	   still receive packets on this port
 	 */
+	rtnl_lock();
 	dev_set_promiscuity(dev, -1);
+	rtnl_unlock();
+
 	/* Now let all incoming queue processors know that frames on this port
 	   are not handled by the switch anymore.
 	 */
