@@ -17,6 +17,7 @@
  */
 
 #include "sw_private.h"
+#include <linux/ethtool.h>
 
 struct net_device *sw_vif_find(struct net_switch *sw, int vlan) {
 	struct net_switch_vif_priv *priv;
@@ -77,6 +78,16 @@ int sw_vif_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd) {
 	return 0;
 }
 
+static struct ethtool_ops vif_ethtool_ops = {
+	.get_tx_csum = ethtool_op_get_tx_csum,
+	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = ethtool_op_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = ethtool_op_set_tso,
+	.get_link = ethtool_op_get_link,
+};
+
 int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
 {
 	char buf[9];
@@ -112,6 +123,7 @@ int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
 	dev->get_stats = sw_vif_get_stats;
 	dev->tx_timeout = sw_vif_tx_timeout;
 	dev->watchdog_timeo = HZ;
+	SET_ETHTOOL_OPS(dev, &vif_ethtool_ops);
 	
 	priv = netdev_priv(dev);
 	INIT_LIST_HEAD(&priv->bogo_port.lh); /* paranoid */
