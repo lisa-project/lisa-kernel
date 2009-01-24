@@ -191,3 +191,8 @@ void sw_vif_cleanup(struct net_switch *sw) {
 		list_for_each_entry_safe(priv, tmp, &sw->vif[i], lh)
 			__vif_delif(priv->bogo_port.dev);
 }
+
+int sw_vif_test(struct net_device *dev)
+{
+	return dev->open == sw_vif_open;
+}
