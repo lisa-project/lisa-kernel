@@ -435,7 +435,7 @@ static int sw_set_port_vlan(struct net_switch_port *port, int vlan) {
 	return 0;
 }
 
-static int sw_get_mac_loop(int hash_pos, struct net_switch_ioctl_arg *arg,
+static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 		struct net_switch_port *port, int len) {
 	struct net_switch_fdb_entry *entry;
 	struct net_switch_mac mac;
@@ -477,7 +477,7 @@ static int sw_get_mac_loop(int hash_pos, struct net_switch_ioctl_arg *arg,
 	return len;
 }
 
-static int sw_get_mac(struct net_switch_ioctl_arg *arg, struct net_switch_port *port) {
+static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 	int i, ret = 0;
 
 	rcu_read_lock();
@@ -494,7 +494,7 @@ static int sw_get_mac(struct net_switch_ioctl_arg *arg, struct net_switch_port *
 	return ret;
 }
 
-int sw_get_vdb(struct net_switch_ioctl_arg *arg) {
+int sw_get_vdb(struct swcfgreq *arg) {
 	char *buf = arg->ext.varg.buf;
 	int entries = 0;
 	char *buf_range = buf + arg->ext.varg.buf_size;
@@ -545,7 +545,7 @@ int sw_get_vdb(struct net_switch_ioctl_arg *arg) {
 int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg) {
 	struct net_device *dev = NULL;
 	struct net_switch_port *port = NULL;
-	struct net_switch_ioctl_arg arg;
+	struct swcfgreq arg;
 	unsigned char bitmap[SW_VLAN_BMP_NO];
 	int err = -EINVAL;
 	int do_put = 0;
@@ -559,7 +559,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	if(!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	if (copy_from_user(&arg, uarg, sizeof(struct net_switch_ioctl_arg)))
+	if (copy_from_user(&arg, uarg, sizeof(arg)))
 		return -EFAULT;
 
 	memset(bitmap, 0xFF, SW_VLAN_BMP_NO);
@@ -639,7 +639,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		age_time = atomic_read(&sw.fdb_age_time);
 		arg.ext.nsec = age_time / HZ;
 		err = 0;
-		if(copy_to_user(uarg, &arg, sizeof(struct net_switch_ioctl_arg))) {
+		if(copy_to_user(uarg, &arg, sizeof(arg))) {
 			err = -EFAULT;
 			break;
 		}
@@ -743,7 +743,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		}
 		arg.ext.cfg.speed = port->speed;
 		arg.ext.cfg.duplex = port->duplex;
-		if(copy_to_user(uarg, &arg, sizeof(struct net_switch_ioctl_arg))) {
+		if(copy_to_user(uarg, &arg, sizeof(arg))) {
 			err = -EFAULT;
 			break;
 		}
@@ -789,7 +789,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_GETVDB:
 		err = sw_get_vdb(&arg);
-		if (copy_to_user(uarg, &arg, sizeof(struct net_switch_ioctl_arg)))
+		if (copy_to_user(uarg, &arg, sizeof(arg)))
 			err = -EFAULT;
 		break;
 	case SWCFG_SETSWPORT:
