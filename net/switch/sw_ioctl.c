@@ -543,7 +543,7 @@ int sw_get_vdb(struct swcfgreq *arg) {
    device; they control the switching engine as a whole.
  */
 int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg) {
-	struct net_device *dev = NULL;
+	struct net_device *dev = NULL, *rdev;
 	struct net_switch_port *port = NULL;
 	struct swcfgreq arg;
 	unsigned char bitmap[SW_VLAN_BMP_NO];
@@ -658,7 +658,11 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		err = fdb_del(&sw, arg.ext.mac, port, arg.vlan, SW_FDB_STATIC) ? 0 : -ENOENT;
 		break;
 	case SWCFG_ADDVIF:
-		err = sw_vif_addif(&sw, arg.vlan);
+		err = sw_vif_addif(&sw, arg.vlan, &rdev);
+		if (!err || err == -EEXIST) {
+			arg.ifindex = rdev->ifindex;
+			err = copy_to_user(uarg, &arg, sizeof(arg)) ? -EFAULT : err;
+		}
 		if (!err)
 			err = sw_vif_enable(&sw, arg.vlan);
 		break;
@@ -744,6 +748,30 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		arg.ext.cfg.speed = port->speed;
 		arg.ext.cfg.duplex = port->duplex;
 		if(copy_to_user(uarg, &arg, sizeof(arg))) {
+			err = -EFAULT;
+			break;
+		}
+		err = 0;
+		break;
+	case SWCFG_GETIFTYPE:
+		DEV_GET;
+		do {
+			if (sw_vif_test(dev)) {
+				struct net_switch_vif_priv *priv = netdev_priv(dev);
+
+				arg.ext.switchport = SW_IF_VIF;
+				arg.vlan = priv->bogo_port.vlan;
+				break;
+			}
+			port = rcu_dereference(dev->sw_port);
+			if (!port) {
+				arg.ext.switchport = SW_IF_NONE;
+				break;
+			}
+			arg.ext.switchport = (port->flags & SW_PFL_NOSWITCHPORT) ?
+				SW_IF_ROUTED : SW_IF_SWITCHED;
+		} while (0);
+		if (copy_to_user(uarg, &arg, sizeof(arg))) {
 			err = -EFAULT;
 			break;
 		}
