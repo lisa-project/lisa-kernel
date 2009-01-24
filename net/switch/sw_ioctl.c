@@ -62,15 +62,10 @@ static inline void __sw_remove_from_vlans(struct net_switch_port *port) {
  */
 static int sw_addif(struct net_device *dev) {
 	struct net_switch_port *port;
-	struct net_switch_vif_priv *priv; 
-	int i;
 
-	for (i=0; i<SW_VIF_HASH_SIZE; i++)
-		list_for_each_entry(priv, &sw.vif[i], lh) {
-			if (dev == priv->bogo_port.dev)
-				return -EINVAL;
-		}
-			
+	if (sw_vif_test(dev))
+		return -EINVAL;
+
 	if(rcu_dereference(dev->sw_port) != NULL) {
 		/* dev->sw_port shouldn't be changed elsewhere, so
 		   we don't necessarily need rcu_dereference here
@@ -528,12 +523,7 @@ int sw_get_vdb(struct net_switch_ioctl_arg *arg) {
 }
 
 #define DEV_GET if(1) {\
-	if(!strncpy_from_user(if_name, arg.if_name, IFNAMSIZ)) {\
-		err = -EFAULT;\
-		break;\
-	}\
-	if_name[IFNAMSIZ - 1] = '\0';\
-	if((dev = dev_get_by_name(net, if_name)) == NULL) {\
+	if ((dev = dev_get_by_index(net, arg.ifindex)) == NULL) {\
 		err = -ENODEV;\
 		break;\
 	}\
@@ -557,7 +547,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	struct net_switch_port *port = NULL;
 	struct net_switch_ioctl_arg arg;
 	unsigned char bitmap[SW_VLAN_BMP_NO];
-	char if_name[IFNAMSIZ];
 	int err = -EINVAL;
 	int do_put = 0;
 	unsigned long age_time;
@@ -761,7 +750,10 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		err = 0;
 		break;
 	case SWCFG_GETMAC:
-		if (arg.if_name)
+		/* the code in dev_new_index() is small and simple enough to
+		 * figure out that interface indexes are never <= 0; thus
+		 * using a value of 0 to disable filter-by-port is safe */
+		if (arg.ifindex)
 			PORT_GET;
 		if (arg.ext.marg.buf_size < sizeof(struct net_switch_mac)) {
 			err = -EINVAL;
@@ -770,7 +762,10 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		err = sw_get_mac(&arg, port);
 		break;
 	case SWCFG_DELMACDYN:
-		if (arg.if_name) 
+		/* the code in dev_new_index() is small and simple enough to
+		 * figure out that interface indexes are never <= 0; thus
+		 * using a value of 0 to disable filter-by-port is safe */
+		if (arg.ifindex) 
 			PORT_GET;
 	
 		if (port) {
