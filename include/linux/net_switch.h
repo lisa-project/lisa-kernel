@@ -123,7 +123,7 @@ struct net_switch_usr_vdb_arg {
 
 struct net_switch_ioctl_arg {
 	unsigned char cmd;
-	char *if_name;
+	int ifindex;
 	int vlan;
 	union {
 		int access;
