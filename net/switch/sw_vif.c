@@ -77,7 +77,8 @@ int sw_vif_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd) {
 	return 0;
 }
 
-int sw_vif_addif(struct net_switch *sw, int vlan) {
+int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
+{
 	char buf[9];
 	struct net_device *dev;
 	struct net_switch_vif_priv *priv;
@@ -85,8 +86,11 @@ int sw_vif_addif(struct net_switch *sw, int vlan) {
 	
 	if(sw_invalid_vlan(vlan))
 		return -EINVAL;
-	if(sw_vif_find(sw, vlan))
+	if ((dev = sw_vif_find(sw, vlan))) {
+		if (rdev)
+			*rdev = dev;
 		return -EEXIST;
+	}
 	/* We can now safely create the new interface and this is no race
 	   because this is called only from ioctl() and ioctls are
 	   mutually exclusive (a semaphore in socket ioctl routine)
@@ -127,6 +131,8 @@ int sw_vif_addif(struct net_switch *sw, int vlan) {
 	}		
 	if(sw_vdb_add_vlan_default(sw, vlan))
 		sw_vdb_add_port(vlan, &priv->bogo_port);
+	if (rdev)
+		*rdev = dev;
 	
 	return 0;
 }
