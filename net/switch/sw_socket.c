@@ -324,6 +324,7 @@ static int sw_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	int err;
 	void __user *argp = (void __user *)arg;
 
+	dbg("sw_sock_ioctl, cmd=%d\n", cmd);
 	mutex_lock(&sw_ioctl_mutex);
 	err = sw_deviceless_ioctl(sock, cmd, argp);
 	mutex_unlock(&sw_ioctl_mutex);
