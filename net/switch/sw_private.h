@@ -242,7 +242,7 @@ extern int sw_forward(struct net_switch_port *,
 
 /* sw_vif.c */
 extern struct net_device *sw_vif_find(struct net_switch *, int);
-extern int sw_vif_addif(struct net_switch *, int);
+extern int sw_vif_addif(struct net_switch *, int, struct net_device **);
 extern int sw_vif_delif(struct net_switch *, int);
 extern int sw_vif_enable(struct net_switch *, int);
 extern int sw_vif_disable(struct net_switch *, int);
