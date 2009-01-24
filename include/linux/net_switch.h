@@ -19,38 +19,61 @@
 #ifndef _NET_SWITCH_H
 #define _NET_SWITCH_H
 
-#define SWCFG_ADDIF			0x01	/* add interface to switch */
-#define SWCFG_DELIF			0x02	/* remove interface from switch */
-#define SWCFG_ADDVLAN		0x03	/* add vlan to vlan database */
-#define SWCFG_DELVLAN		0x04	/* delete vlan from vlan database */
-#define SWCFG_RENAMEVLAN	0x05	/* rename vlan from vlan database */
-#define SWCFG_ADDVLANPORT	0x06	/* add a port to a vlan (trunk mode) */
-#define SWCFG_DELVLANPORT 	0x07	/* remove a port from a vlan (trunk mode) */
-#define SWCFG_SETACCESS		0x08	/* put a port in access mode */
-#define SWCFG_SETTRUNK		0x09	/* put a port in trunk mode */
-#define SWCFG_SETPORTVLAN 	0x0a	/* add a port in a vlan (non-trunk mode) */
-#define SWCFG_CLEARMACINT	0x0b	/* clear all macs for a given port */
-#define SWCFG_SETAGETIME	0x0c	/* set fdb entry aging time interval (in ms) */
-#define SWCFG_MACSTATIC		0x0d	/* add static mac */
-#define SWCFG_DELMACSTATIC	0x0e	/* delete static mac */
-#define SWCFG_GETIFCFG		0x0f	/* get physical port configuration and status */
-#define SWCFG_ADDVIF		0x10	/* add virtual interface for vlan */
-#define SWCFG_DELVIF		0x11	/* remove virtual interface for vlan */
-#define SWCFG_DISABLEPORT	0x12	/* administratively disable port */
-#define SWCFG_ENABLEPORT	0x13	/* enable port */
-#define SWCFG_SETTRUNKVLANS	0x14	/* set the bitmap of forbidden trunk ports */
-#define SWCFG_ADDTRUNKVLANS	0x15	/* add ports to the bitmap of forbidden trunk ports */
-#define SWCFG_DELTRUNKVLANS	0x16	/* remove ports from the bitmap of forbidden trunk ports */
-#define SWCFG_SETIFDESC		0x17	/* set interface description */
-#define SWCFG_SETSPEED		0x18	/* set port speed parameter */
-#define SWCFG_SETDUPLEX		0x19	/* set port duplex parameter */
-#define SWCFG_GETMAC		0x20	/* fetch mac addresses from the fdb */
-#define SWCFG_DELMACDYN		0x21	/* clear dynamic mac addresses from the fdb */
-#define SWCFG_ENABLEVIF		0x22	/* administratively enable virtual interface */
-#define SWCFG_DISABLEVIF	0x23	/* administratively disable virtual interface */
-#define SWCFG_GETAGETIME	0x24	/* get fdb aging time interval */
-#define SWCFG_GETVDB		0x30	/* copy the whole vlan database to userspace */
-#define SWCFG_SETSWPORT		0x40	/* set port type to switched (1) or routed (0) */
+enum {
+	/* Generic interface manipulation */
+	SWCFG_ADDIF,			/* add interface to switch */
+	SWCFG_DELIF,			/* remove interface from switch */
+	SWCFG_SETSWPORT,		/* set port type to switched (1) or routed (0) */
+	SWCFG_DISABLEPORT,		/* administratively disable port */
+	SWCFG_ENABLEPORT,		/* enable port */
+
+	/* Generic switched interface manipulation */
+	SWCFG_SETIFDESC,		/* set interface description */
+	SWCFG_SETSPEED,			/* set port speed parameter */
+	SWCFG_SETDUPLEX,		/* set port duplex parameter */
+
+	/* VDB manipulation */
+	SWCFG_ADDVLAN,			/* add vlan to vlan database */
+	SWCFG_DELVLAN,			/* delete vlan from vlan database */
+	SWCFG_RENAMEVLAN,		/* rename vlan from vlan database */
+	SWCFG_GETVDB,			/* copy the whole vlan database to userspace */
+
+	/* Vlan-related switched interface manipulation */
+	SWCFG_ADDVLANPORT,		/* add a port to a vlan (trunk mode) */
+	SWCFG_DELVLANPORT ,		/* remove a port from a vlan (trunk mode) */
+	SWCFG_SETACCESS,		/* put a port in access mode */
+	SWCFG_SETTRUNK,			/* put a port in trunk mode */
+	SWCFG_SETPORTVLAN ,		/* add a port in a vlan (non-trunk mode) */
+	SWCFG_ADDTRUNKVLANS,	/* add ports to the bitmap of forbidden trunk ports */
+	SWCFG_DELTRUNKVLANS,	/* remove ports from the bitmap of forbidden trunk ports */
+	SWCFG_SETTRUNKVLANS,	/* set the bitmap of forbidden trunk ports */
+
+	/* FDB manipulation */
+	SWCFG_GETMAC,			/* fetch mac addresses from the fdb */
+	SWCFG_GETAGETIME,		/* get fdb aging time interval */
+	SWCFG_SETAGETIME,		/* set fdb entry aging time interval (in ms) */
+	SWCFG_CLEARMACINT,		/* clear all macs for a given port */
+	SWCFG_MACSTATIC,		/* add static mac */
+	SWCFG_DELMACSTATIC,		/* delete static mac */
+	SWCFG_DELMACDYN,		/* clear dynamic mac addresses from the fdb */
+
+	/* Interface query functions */
+	SWCFG_GETIFCFG,			/* get physical port configuration and status */
+	SWCFG_GETIFTYPE,		/* determine interface relation to switch */
+
+	/* VIF manipulation */
+	SWCFG_ADDVIF,			/* add virtual interface for vlan */
+	SWCFG_DELVIF,			/* remove virtual interface for vlan */
+	SWCFG_ENABLEVIF,		/* administratively enable virtual interface */
+	SWCFG_DISABLEVIF		/* administratively disable virtual interface */
+};
+
+enum {
+	SW_IF_NONE,				/* interface is not related to switch */
+	SW_IF_SWITCHED,			/* interface is a standard switched port */
+	SW_IF_ROUTED,			/* interface is registered to switch, but routed */
+	SW_IF_VIF				/* interface is lisa vlan virtual interface */
+};
 
 #define SW_PFL_DISABLED     0x01
 #define SW_PFL_ACCESS		0x02
@@ -121,8 +144,8 @@ struct net_switch_usr_vdb_arg {
 	char *buf;
 };
 
-struct net_switch_ioctl_arg {
-	unsigned char cmd;
+struct swcfgreq {
+	int cmd;
 	int ifindex;
 	int vlan;
 	union {
