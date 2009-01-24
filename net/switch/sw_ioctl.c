@@ -564,14 +564,14 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	char vlan_desc[SW_MAX_VLAN_NAME+1];
 	struct net *net = sock->sk->sk_net;
 
+	if (cmd != SIOCSWCFG)
+		return -ENOIOCTLCMD;
+
 	if(!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
 	if (copy_from_user(&arg, uarg, sizeof(struct net_switch_ioctl_arg)))
 		return -EFAULT;
-
-	if(cmd != SIOCSWCFG)
-		return -EINVAL;
 
 	memset(bitmap, 0xFF, SW_VLAN_BMP_NO);
 
