@@ -20,12 +20,10 @@
 #define _NET_SWITCH_H
 
 enum {
-	/* Generic interface manipulation */
+	/* Generic port manipulation */
 	SWCFG_ADDIF,			/* add interface to switch */
 	SWCFG_DELIF,			/* remove interface from switch */
 	SWCFG_SETSWPORT,		/* set port type to switched (1) or routed (0) */
-	SWCFG_DISABLEPORT,		/* administratively disable port */
-	SWCFG_ENABLEPORT,		/* enable port */
 
 	/* Generic switched interface manipulation */
 	SWCFG_SETIFDESC,		/* set interface description */
@@ -57,15 +55,15 @@ enum {
 	SWCFG_DELMACSTATIC,		/* delete static mac */
 	SWCFG_DELMACDYN,		/* clear dynamic mac addresses from the fdb */
 
-	/* Interface query functions */
+	/* Generic interface functions */
 	SWCFG_GETIFCFG,			/* get physical port configuration and status */
 	SWCFG_GETIFTYPE,		/* determine interface relation to switch */
+	SWCFG_DISABLE_IF,		/* administratively disable port or vif */
+	SWCFG_ENABLE_IF,		/* enable port or vif */
 
 	/* VIF manipulation */
 	SWCFG_ADDVIF,			/* add virtual interface for vlan */
 	SWCFG_DELVIF,			/* remove virtual interface for vlan */
-	SWCFG_ENABLEVIF,		/* administratively enable virtual interface */
-	SWCFG_DISABLEVIF		/* administratively disable virtual interface */
 };
 
 enum {

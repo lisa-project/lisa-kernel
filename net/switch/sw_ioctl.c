@@ -63,7 +63,7 @@ static inline void __sw_remove_from_vlans(struct net_switch_port *port) {
 static int sw_addif(struct net_device *dev) {
 	struct net_switch_port *port;
 
-	if (sw_vif_test(dev))
+	if (sw_is_vif(dev))
 		return -EINVAL;
 
 	if(rcu_dereference(dev->sw_port) != NULL) {
@@ -530,13 +530,17 @@ int sw_get_vdb(struct swcfgreq *arg) {
 	do_put = 1;\
 }
 
-#define PORT_GET if(1) {\
-	DEV_GET;\
+#define __PORT_GET if(1) {\
 	port = rcu_dereference(dev->sw_port);\
 	if(!port) {\
 		err = -EINVAL;\
 		break;\
 	}\
+}
+
+#define PORT_GET if(1) {\
+	DEV_GET;\
+	__PORT_GET;\
 }
 
 /* Handle "deviceless" ioctls. These ioctls are not specific to a certain
@@ -664,24 +668,40 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = copy_to_user(uarg, &arg, sizeof(arg)) ? -EFAULT : err;
 		}
 		if (!err)
-			err = sw_vif_enable(&sw, arg.vlan);
+			err = sw_vif_enable(rdev);
 		break;
 	case SWCFG_DELVIF:
 		err = sw_vif_delif(&sw, arg.vlan);
+		/* FIXME FIXME FIXME nu e un pic cam tarziu sa dam cu disable?
 		if (!err)
 			err = sw_vif_disable(&sw, arg.vlan);
+		*/
 		break;
-	case SWCFG_DISABLEPORT:
-		PORT_GET;
+	case SWCFG_DISABLE_IF:
+		err = 0;
+		DEV_GET;
+
+		if (sw_is_vif(dev)) {
+			sw_vif_disable(dev);
+			break;
+		}
+
+		__PORT_GET;
 		sw_set_port_flag(port, SW_PFL_ADMDISABLED);
 		sw_disable_port(port);
-		err = 0;
 		break;
-	case SWCFG_ENABLEPORT:
-		PORT_GET;
+	case SWCFG_ENABLE_IF:
+		err = 0;
+		DEV_GET;
+
+		if (sw_is_vif(dev)) {
+			sw_vif_enable(dev);
+			break;
+		}
+
+		__PORT_GET;
 		sw_res_port_flag(port, SW_PFL_ADMDISABLED);
 		sw_enable_port(port);
-		err = 0;
 		break;
 	case SWCFG_SETTRUNKVLANS:
 		PORT_GET;
@@ -756,7 +776,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	case SWCFG_GETIFTYPE:
 		DEV_GET;
 		do {
-			if (sw_vif_test(dev)) {
+			if (sw_is_vif(dev)) {
 				struct net_switch_vif_priv *priv = netdev_priv(dev);
 
 				arg.ext.switchport = SW_IF_VIF;
@@ -808,12 +828,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = fdb_del(&sw, arg.ext.mac, port, arg.vlan, SW_FDB_DYN);
 		else 
 			err = fdb_cleanup_by_type(&sw, SW_FDB_DYN);
-		break;
-	case SWCFG_ENABLEVIF:
-		err = sw_vif_enable(&sw, arg.vlan);
-		break;
-	case SWCFG_DISABLEVIF:
-		err = sw_vif_disable(&sw, arg.vlan);
 		break;
 	case SWCFG_GETVDB:
 		err = sw_get_vdb(&arg);

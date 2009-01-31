@@ -162,29 +162,21 @@ int sw_vif_delif(struct net_switch *sw, int vlan) {
 }
 
 /* Administratively enable the virtual interface */
-/* FIXME: bogo_port flags ? */
-int sw_vif_enable(struct net_switch *sw, int vlan) {
-	struct net_device *dev;
-	
-	if (sw_invalid_vlan(vlan))
-		return -EINVAL;
-	if ((dev = sw_vif_find(sw, vlan)) == NULL)
-		return -ENOENT;
-	
+/* FIXME: bogo_port flags? otherwise sw_device_up can be used instead */
+int sw_vif_enable(struct net_device *dev)
+{
+	BUG_ON(!sw_is_vif(dev));
+	dbg("sw_vif_enable (%s)\n", dev->name);
 	sw_device_up(dev);
 	return 0;
 }
 
 /* Administratively disable the virtual interface */
-/* FIXME: bogo_port flags ? */
-int sw_vif_disable(struct net_switch *sw, int vlan) {
-	struct net_device *dev;
-	
-	if (sw_invalid_vlan(vlan))
-		return -EINVAL;
-	if ((dev = sw_vif_find(sw, vlan)) == NULL)
-		return -ENOENT;
-
+/* FIXME: bogo_port flags? otherwise sw_device_down can be used instead */
+int sw_vif_disable(struct net_device *dev)
+{
+	BUG_ON(!sw_is_vif(dev));
+	dbg("sw_vif_disable (%s)\n", dev->name);
 	sw_device_down(dev);
 	return 0;
 }
@@ -198,7 +190,7 @@ void sw_vif_cleanup(struct net_switch *sw) {
 			__vif_delif(priv->bogo_port.dev);
 }
 
-int sw_vif_test(struct net_device *dev)
+int sw_is_vif(struct net_device *dev)
 {
 	return dev->open == sw_vif_open;
 }
