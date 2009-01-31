@@ -244,10 +244,10 @@ extern int sw_forward(struct net_switch_port *,
 extern struct net_device *sw_vif_find(struct net_switch *, int);
 extern int sw_vif_addif(struct net_switch *, int, struct net_device **);
 extern int sw_vif_delif(struct net_switch *, int);
-extern int sw_vif_enable(struct net_switch *, int);
-extern int sw_vif_disable(struct net_switch *, int);
+extern int sw_vif_enable(struct net_device *);
+extern int sw_vif_disable(struct net_device *);
 extern void sw_vif_cleanup(struct net_switch *);
-extern int sw_vif_test(struct net_device *);
+extern int sw_is_vif(struct net_device *);
 static __inline__ void sw_vif_rx(struct sk_buff *skb, int pkt_type, struct net_device *dev) {
 	struct net_switch_vif_priv *priv;
 
