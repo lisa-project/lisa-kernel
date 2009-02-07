@@ -32,6 +32,17 @@ MODULE_AUTHOR("us");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.1");
 
+/**
+ * String representation of VIF (Per-Vlan Virtual Interfaces) mac
+ * address.
+ *
+ * First byte means "locally administrated address" and unicast, last
+ * 4 bytes are hex representation of "LiSA".
+ */
+static char *vif_mac = "02:00:4c:69:53:41";
+module_param(vif_mac, charp, S_IRUGO);
+MODULE_PARM_DESC(vif_mac, "Per-Vlan Virtual Interfaces (VIF) MAC address");
+
 extern int (*sw_handle_frame_hook)(struct net_switch_port *, struct sk_buff **, int *);
 
 struct net_switch sw;
@@ -239,7 +250,7 @@ void sw_disable_port(struct net_switch_port *port) {
 }
 
 /* Initialize everything associated with a switch */
-static void init_switch(struct net_switch *sw) {
+static void init_switch(struct net_switch *sw, const unsigned char *vif_mac) {
 	int i;
 	
 	memset(sw, 0, sizeof(struct net_switch));
@@ -247,8 +258,7 @@ static void init_switch(struct net_switch *sw) {
 	for (i=0; i<SW_VIF_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&sw->vif[i]);
 	}
-	memcpy(sw->vif_mac, "\0lms\0\0", 6);
-	/* TODO module parameter to initialize vif_mac */
+	memcpy(sw->vif_mac, vif_mac, 6);
 	atomic_set(&sw->fdb_age_time, SW_DEFAULT_AGE_TIME * HZ); 
 	sw_fdb_init(sw);
 	init_switch_proc();
@@ -277,14 +287,41 @@ static void switch_cleanup(void) {
 	sw_sock_exit();
 }
 
+static inline int parse_vif_mac_arg(unsigned char *dest)
+{
+	int i, x[6];
+	char c;
+
+	i = sscanf(vif_mac, "%x%c%x%c%x%c%x%c%x%c%x", &x[0], &c,
+			&x[1], &c, &x[2], &c, &x[3], &c, &x[4], &c, &x[5]);
+
+	if (i < 11)
+		return -EINVAL;
+
+	for (i = 0; i < 6; i++) {
+		if (x[i] > 0xff)
+			return -EINVAL;
+		dest[i] = x[i];
+	}
+
+	return 0;
+}
+
 /* Module initialization */
-static int switch_init(void) {
-	int err = sw_sock_init();
+static int switch_init(void)
+{
+	int err;
+	unsigned char m[6];
+
+	if ((err = parse_vif_mac_arg(m)))
+		goto out;
+	dbg("Switch vif mac %02x:%02x:%02x:%02x:%02x:%02x\n", (int)m[0],
+			(int)m[1], (int)m[2], (int)m[3], (int)m[4], (int)m[5]);
 	
-	if(err)
+	if ((err = sw_sock_init()))
 		goto out;
 
-	init_switch(&sw);
+	init_switch(&sw, m);
 	sw_handle_frame_hook = sw_handle_frame;
 
 	/* Register ourselves to receive notifications for net devices */
