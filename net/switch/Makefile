@@ -27,7 +27,8 @@ CFGFLAGS += -DDEBUG -g
 
 EXTRA_CFLAGS += $(CFGFLAGS)
 
-# KDIR := /lib/modules/$(KVER)/build
+#KVER := $(shell uname -r)
+#KDIR := /lib/modules/$(KVER)/build
 KDIR := ../..
 
 PWD=$(shell pwd)

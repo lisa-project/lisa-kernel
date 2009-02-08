@@ -112,6 +112,11 @@ struct net_switch_ifcfg {
 	int duplex;
 };
 
+/**
+ * FDB query result.
+ *
+ * Only used by switch ioctl() to fill userspace buffer on FDB queries.
+ */
 struct net_switch_mac {
 	unsigned char addr[ETH_ALEN];
 	int addr_type;
@@ -121,10 +126,9 @@ struct net_switch_mac {
 
 struct net_switch_mac_arg {
 	unsigned char addr[ETH_ALEN];
-	int buf_size;
-	int actual_size;
 	int addr_type;
 	char *buf;
+	int buf_size;
 };
 
 #define SW_DEFAULT_AGE_TIME 300
