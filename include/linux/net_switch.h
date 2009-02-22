@@ -119,31 +119,23 @@ struct net_switch_ifcfg {
  */
 struct net_switch_mac {
 	unsigned char addr[ETH_ALEN];
-	int addr_type;
+	int type;
 	int vlan;
-	char port[IFNAMSIZ];
-};
-
-struct net_switch_mac_arg {
-	unsigned char addr[ETH_ALEN];
-	int addr_type;
-	char *buf;
-	int buf_size;
+	int ifindex;
 };
 
 #define SW_DEFAULT_AGE_TIME 300
 
 #define SW_MAX_VLAN_NAME	31
 
-struct net_switch_usr_vdb {
+/**
+ * VDB query result.
+ *
+ * Only used by switch ioctl() to fill userspace buffer on VDB queries.
+ */
+struct net_switch_vdb {
 	int vlan;
 	char name[SW_MAX_VLAN_NAME + 1];
-};
-
-struct net_switch_usr_vdb_arg {
-	int buf_size;
-	int vdb_entries;
-	char *buf;
 };
 
 struct swcfgreq {
@@ -154,17 +146,25 @@ struct swcfgreq {
 		int access;
 		int trunk;
 		int nsec;
-		unsigned char *mac;
 		unsigned char *bmp;
 		char *vlan_desc;
 		char *iface_desc;
 		int speed;
 		int duplex;
 		struct net_switch_ifcfg cfg;
-		struct net_switch_mac_arg marg;
-		struct net_switch_usr_vdb_arg varg;
+		struct {
+			unsigned char addr[ETH_ALEN];
+			int type;
+		} mac;
 		int switchport;
 	} ext;
+
+	/* Userspace supplied buffer for dumping large data such as
+	 * mac list or vdb entry list */
+	struct {
+		char *addr;
+		int size;
+	} buf;
 };
 
 /* Mac Address types (any, static, dynamic) */
