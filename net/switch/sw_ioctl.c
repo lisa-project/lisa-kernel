@@ -439,31 +439,29 @@ static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 		struct net_switch_port *port, int len) {
 	struct net_switch_fdb_entry *entry;
 	struct net_switch_mac mac;
-	struct net_switch_mac_arg *marg = &arg->ext.marg;
-	int cmp_mac = !is_null_mac(marg->addr);
+	int cmp_mac = !is_null_mac(arg->ext.mac.addr);
 	int vlan = arg->vlan;
 
 	list_for_each_entry_rcu(entry, &sw.fdb[hash_pos].entries, lh) {
-		if (cmp_mac && memcmp(marg->addr, entry->mac, ETH_ALEN))
+		if (cmp_mac && memcmp(arg->ext.mac.addr, entry->mac, ETH_ALEN))
 			continue;
 		if (vlan && vlan != entry->vlan)
 			continue;
 		if (port && port != entry->port)
 			continue;
-		if (marg->addr_type != SW_FDB_ANY && marg->addr_type != entry->is_static)
+		if (arg->ext.mac.type != SW_FDB_ANY && arg->ext.mac.type != entry->is_static)
 			continue;
-		if (len + sizeof(struct net_switch_mac) > marg->buf_size) {
+		if (len + sizeof(struct net_switch_mac) > arg->buf.size) {
 			dbg("sw_get_mac_loop: insufficient buffer space\n");
 			len = -ENOMEM;
 			break;
 		}
 		memcpy(mac.addr, entry->mac, ETH_ALEN);
-		mac.addr_type = entry->is_static;
+		mac.type = entry->is_static;
 		mac.vlan = entry->vlan;
-		strncpy(mac.port, entry->port->dev->name, IFNAMSIZ);
-		mac.port[IFNAMSIZ-1] = '\0';
+		mac.ifindex = entry->port->dev->ifindex;
 		rcu_read_unlock();
-		if (copy_to_user(marg->buf+len, &mac, sizeof(struct net_switch_mac))) {
+		if (copy_to_user(arg->buf.addr + len, &mac, sizeof(struct net_switch_mac))) {
 			rcu_read_lock();
 			dbg("copy_to_user failed (hash_pos=%d)\n", hash_pos);
 			len = -EFAULT;
@@ -481,8 +479,8 @@ static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 	int i, ret = 0;
 
 	rcu_read_lock();
-	if (!is_null_mac(arg->ext.marg.addr)) 
-		ret = sw_get_mac_loop(sw_mac_hash(arg->ext.marg.addr), arg, port, ret);
+	if (!is_null_mac(arg->ext.mac.addr)) 
+		ret = sw_get_mac_loop(sw_mac_hash(arg->ext.mac.addr), arg, port, ret);
 	else 
 		for (i=0; i<SW_HASH_SIZE; i++) {
 			ret = sw_get_mac_loop(i, arg, port, ret);
@@ -495,10 +493,8 @@ static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 }
 
 int sw_get_vdb(struct swcfgreq *arg) {
-	char *buf = arg->ext.varg.buf;
-	int entries = 0;
-	char *buf_range = buf + arg->ext.varg.buf_size;
-	struct net_switch_usr_vdb entry;
+	int size = 0;
+	struct net_switch_vdb entry;
 	int vlan;
 
 	for(vlan = SW_MIN_VLAN; vlan <= SW_MAX_VLAN; vlan++) {
@@ -510,16 +506,14 @@ int sw_get_vdb(struct swcfgreq *arg) {
 		entry.vlan = vlan;
 		strcpy(entry.name, sw.vdb[vlan]->name);
 		rcu_read_unlock();
-		if(buf + sizeof(struct net_switch_usr_vdb) > buf_range)
+		if (size + sizeof(struct net_switch_vdb) > arg->buf.size)
 			return -ENOMEM;
-		if(copy_to_user(buf, &entry, sizeof(struct net_switch_usr_vdb)))
+		if (copy_to_user(arg->buf.addr + size, &entry, sizeof(struct net_switch_vdb)))
 			return -EFAULT;
-		buf += sizeof(struct net_switch_usr_vdb);
-		entries++;
+		size += sizeof(struct net_switch_vdb);
 	}
 
-	arg->ext.varg.vdb_entries = entries;
-	return 0;
+	return size;
 }
 
 #define DEV_GET if(1) {\
@@ -650,16 +644,15 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_MACSTATIC:
 		PORT_GET;
-		err = fdb_learn(arg.ext.mac, port, arg.vlan, SW_FDB_STATIC,
-				is_mcast_mac(arg.ext.mac));
+		err = fdb_learn(arg.ext.mac.addr, port, arg.vlan, SW_FDB_STATIC, is_mcast_mac(arg.ext.mac.addr));
 		break;
 	case SWCFG_DELMACSTATIC:
 		PORT_GET;
-		if (is_null_mac(arg.ext.mac)) {
+		if (is_null_mac(arg.ext.mac.addr)) {
 			err = -EINVAL;
 			break;
 		}
-		err = fdb_del(&sw, arg.ext.mac, port, arg.vlan, SW_FDB_STATIC) ? 0 : -ENOENT;
+		err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_STATIC) ? 0 : -ENOENT;
 		break;
 	case SWCFG_ADDVIF:
 		err = sw_vif_addif(&sw, arg.vlan, &rdev);
@@ -803,10 +796,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		 * using a value of 0 to disable filter-by-port is safe */
 		if (arg.ifindex)
 			PORT_GET;
-		if (arg.ext.marg.buf_size < sizeof(struct net_switch_mac)) {
-			err = -EINVAL;
-			break;
-		}	
 		err = sw_get_mac(&arg, port);
 		break;
 	case SWCFG_DELMACDYN:
@@ -824,15 +813,13 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = fdb_cleanup_vlan(&sw, arg.vlan, SW_FDB_DYN);
 			break;
 		}
-		if (!is_null_mac(arg.ext.mac))
-			err = fdb_del(&sw, arg.ext.mac, port, arg.vlan, SW_FDB_DYN);
+		if (!is_null_mac(arg.ext.mac.addr))
+			err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_DYN);
 		else 
 			err = fdb_cleanup_by_type(&sw, SW_FDB_DYN);
 		break;
 	case SWCFG_GETVDB:
 		err = sw_get_vdb(&arg);
-		if (copy_to_user(uarg, &arg, sizeof(arg)))
-			err = -EFAULT;
 		break;
 	case SWCFG_SETSWPORT:
 		PORT_GET;
