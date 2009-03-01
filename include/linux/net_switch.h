@@ -24,6 +24,7 @@ enum {
 	SWCFG_ADDIF,			/* add interface to switch */
 	SWCFG_DELIF,			/* remove interface from switch */
 	SWCFG_SETSWPORT,		/* set port type to switched (1) or routed (0) */
+	SWCFG_GETIFLIST,		/* get a list of all known interfaces */
 
 	/* Generic switched interface manipulation */
 	SWCFG_SETIFDESC,		/* set interface description */
@@ -67,10 +68,10 @@ enum {
 };
 
 enum {
-	SW_IF_NONE,				/* interface is not related to switch */
-	SW_IF_SWITCHED,			/* interface is a standard switched port */
-	SW_IF_ROUTED,			/* interface is registered to switch, but routed */
-	SW_IF_VIF				/* interface is lisa vlan virtual interface */
+	SW_IF_NONE		= 0x00,	/* interface is not related to switch */
+	SW_IF_SWITCHED	= 0x01,	/* interface is a standard switched port */
+	SW_IF_ROUTED	= 0x02,	/* interface is registered to switch, but routed */
+	SW_IF_VIF		= 0x04	/* interface is lisa vlan virtual interface */
 };
 
 #define SW_PFL_DISABLED     0x01
@@ -115,7 +116,7 @@ struct net_switch_ifcfg {
 /**
  * FDB query result.
  *
- * Only used by switch ioctl() to fill userspace buffer on FDB queries.
+ * Only used to fill userspace buffer on ioctl() queries.
  */
 struct net_switch_mac {
 	unsigned char addr[ETH_ALEN];
@@ -131,11 +132,23 @@ struct net_switch_mac {
 /**
  * VDB query result.
  *
- * Only used by switch ioctl() to fill userspace buffer on VDB queries.
+ * Only used to fill userspace buffer on ioctl() queries.
  */
 struct net_switch_vdb {
 	int vlan;
 	char name[SW_MAX_VLAN_NAME + 1];
+};
+
+/**
+ * Interface list query result
+ *
+ * Only used to fill userspace buffer on ioctl() queries.
+ */
+struct net_switch_dev {
+	char name[IFNAMSIZ];
+	int ifindex;
+	int type;
+	int vlan; /* only used for VIFs */
 };
 
 struct swcfgreq {
