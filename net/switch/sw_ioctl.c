@@ -506,11 +506,43 @@ int sw_get_vdb(struct swcfgreq *arg) {
 		entry.vlan = vlan;
 		strcpy(entry.name, sw.vdb[vlan]->name);
 		rcu_read_unlock();
-		if (size + sizeof(struct net_switch_vdb) > arg->buf.size)
-			return -ENOMEM;
-		if (copy_to_user(arg->buf.addr + size, &entry, sizeof(struct net_switch_vdb)))
-			return -EFAULT;
-		size += sizeof(struct net_switch_vdb);
+		push_to_user_buf(entry, arg, size);
+	}
+
+	return size;
+}
+
+int sw_getiflist(struct swcfgreq *arg)
+{
+	int size = 0;
+	struct net_switch_dev entry;
+	struct net_switch_port *port;
+
+	if (arg->ext.switchport & (SW_IF_SWITCHED | SW_IF_ROUTED))
+		list_for_each_entry(port, &sw.ports, lh) {
+			entry.type = port->flags & SW_PFL_NOSWITCHPORT ?
+				SW_IF_ROUTED : SW_IF_SWITCHED;
+			if (!(entry.type & arg->ext.switchport))
+				continue;
+			strncpy(entry.name, port->dev->name, IFNAMSIZ);
+			entry.ifindex = port->dev->ifindex;
+			entry.vlan = 0;
+			push_to_user_buf(entry, arg, size);
+		}
+
+	if (arg->ext.switchport & SW_IF_VIF) {
+		int i;
+		struct net_switch_vif_priv *vif_priv;
+
+		for (i = 0; i < SW_VIF_HASH_SIZE; i++)
+			list_for_each_entry(vif_priv, &sw.vif[i], lh) {
+				port = &vif_priv->bogo_port;
+				strncpy(entry.name, port->dev->name, IFNAMSIZ);
+				entry.ifindex = port->dev->ifindex;
+				entry.type = SW_IF_VIF;
+				entry.vlan = port->vlan;
+				push_to_user_buf(entry, arg, size);
+			}
 	}
 
 	return size;
@@ -824,6 +856,9 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	case SWCFG_SETSWPORT:
 		PORT_GET;
 		err = sw_set_switchport(port, arg.ext.switchport);
+		break;
+	case SWCFG_GETIFLIST:
+		err = sw_getiflist(&arg);
 		break;
 	}
 

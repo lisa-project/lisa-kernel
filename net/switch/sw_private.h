@@ -234,6 +234,15 @@ extern int sw_delif(struct net_device *);
 extern int sw_deviceless_ioctl(struct socket *, unsigned int, void __user *);
 extern void dump_mem(void *, int);
 
+#define push_to_user_buf(__entry, __arg, __size) do {\
+	if (__size + sizeof(__entry) > (__arg)->buf.size)\
+		return -ENOMEM;\
+	if (copy_to_user((__arg)->buf.addr + __size, &(__entry), sizeof(__entry)))\
+		return -EFAULT;\
+	__size += sizeof(__entry);\
+} while (0)
+
+
 #define VLAN_TAG_BYTES 4
 
 /* sw_forward.c */
