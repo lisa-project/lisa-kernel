@@ -19,6 +19,8 @@
 
 #include "sw_private.h"
 
+int (*lac_dev_ioctl_hook)(struct net_device *dev, lac_cmd_t user_cmd,char *if_name,int command);//ADI
+
 inline void dump_mem(void *m, int len) {
 	int j;
 	char buf[65];
@@ -60,7 +62,7 @@ static inline void __sw_remove_from_vlans(struct net_switch_port *port) {
 /* Add an interface to the switch. The switch configuration mutex must
    be acquired from outside.
  */
-static int sw_addif(struct net_device *dev) {
+int sw_addif(struct net_device *dev) {
 	struct net_switch_port *port;
 	struct net_switch_vif_priv *priv; 
 	int i;
@@ -564,6 +566,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	char vlan_desc[SW_MAX_VLAN_NAME+1];
 	struct net *net = sock->sk->sk_net;
 
+
 	if(!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
@@ -796,10 +799,57 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		err = sw_get_vdb(&arg);
 		if (copy_to_user(uarg, &arg, sizeof(struct net_switch_ioctl_arg)))
 			err = -EFAULT;
-		break;
+		break;	
 	case SWCFG_SETSWPORT:
 		PORT_GET;
 		err = sw_set_switchport(port, arg.ext.switchport);
+		break;
+	case LACTL_ADD_IF://ADI  LAC ioctl-s
+	case LACTL_DEL_IF:
+	case LACTL_SET_AGG_STATE_ENABLED:
+	case LACTL_SET_AGG_STATE_DISABLED:
+	case LACTL_SET_MODE_ACTIVE:
+	case LACTL_SET_MODE_PASSIVE:
+	case LACTL_SET_ADMIN_KEY:
+	case LACTL_SET_PORT_PRIO:
+	case LACTL_SET_SHORT_TIMEOUT:
+	case LACTL_SET_LONG_TIMEOUT:
+	case LACTL_SET_SYS_PRIO:
+	case LACTL_SET_SYS_MAX_DELAY:
+	case LACTL_GET_SYSTEM:
+	case LACTL_GET_PORTS:
+	case LACTL_GET_PORT_BY_NAME:
+	case LACTL_GET_AGG:
+	case LACTL_DEBUG_PORT:
+	case LACTL_DEBUG_RX:
+	case LACTL_DEBUG_TX:
+	case LACTL_DEBUG_STATE:
+	case LACTL_DEBUG_WARN:
+	case LACTL_ADD_AGG:
+	case LACTL_REM_AGG:
+		if(arg.cmd==LACTL_ADD_AGG || arg.cmd==LACTL_REM_AGG)
+		{
+			if(!strncpy_from_user(if_name, arg.if_name, IFNAMSIZ)) 
+			{
+				err = -EFAULT;
+				break;
+			}
+			if_name[IFNAMSIZ - 1] = '\0';
+			dev=NULL;
+		}
+		else
+		{
+			DEV_GET;
+		}
+
+		if(lac_dev_ioctl_hook!=NULL)
+		{
+			err=lac_dev_ioctl_hook(dev,arg.lac_user_cmd,if_name,arg.cmd);
+		}
+		else
+		{
+			err=-ENODEV;
+		}
 		break;
 	}
 
@@ -811,3 +861,21 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 
 #undef DEV_GET
 #undef PORT_GET
+
+
+
+EXPORT_SYMBOL(lac_dev_ioctl_hook);//ADI
+EXPORT_SYMBOL(sw_addif);//ADI
+
+
+
+
+
+
+
+
+
+
+
+
+

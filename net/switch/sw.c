@@ -119,6 +119,11 @@ __dbg_static int sw_handle_frame(struct net_switch_port *port,
 	struct sk_buff *skb = *pskb;
 	struct skb_extra skb_e;
 
+	if(handle_lac(pskb))//ADI  hookul LAC intern LISA (ca sa nu schimb dev.c-ul)
+	{
+		return NET_RX_DROP;
+	}
+
 	if(port->flags & SW_PFL_DISABLED) {
 		dbg("Received frame on disabled port %s\n", port->dev->name);
 		goto free_skb;

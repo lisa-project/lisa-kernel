@@ -27,6 +27,9 @@
 #include <asm/semaphore.h>
 #include <asm/atomic.h>
 
+#include "../lac/lac_private.h"
+#include "../lac/lac_protocol.h"
+
 #ifdef DEBUG
 #define dbg(text,par...) printk(KERN_DEBUG text, ##par)
 #define __dbg_static
@@ -34,6 +37,7 @@
 #define dbg(par...)
 #define __dbg_static static
 #endif
+
 #define SW_HASH_SIZE_BITS 12
 #define SW_HASH_SIZE (1 << SW_HASH_SIZE_BITS)
 
@@ -233,6 +237,7 @@ extern void cleanup_switch_proc(void);
 extern int sw_delif(struct net_device *);
 extern int sw_deviceless_ioctl(struct socket *, unsigned int, void __user *);
 extern void dump_mem(void *, int);
+extern int sw_addif(struct net_device *dev);
 
 #define VLAN_TAG_BYTES 4
 
@@ -284,4 +289,23 @@ static __inline__ void sw_vif_rx(struct sk_buff *skb, int pkt_type, struct net_d
 /* sw_socket.c */
 extern int sw_socket_filter(struct sk_buff *, struct net_switch_port *);
 
+/*sw_lac.c*/
+
+
+#if defined(CONFIG_LAC) || defined (CONFIG_LAC_MODULE)
+extern __inline__ int handle_lac(struct sk_buff **pskb);//ADI cred ca putzin inutil
+#else
+#define handle_lac(skb)	(0)
 #endif
+
+#endif
+
+
+
+
+
+
+
+
+
+

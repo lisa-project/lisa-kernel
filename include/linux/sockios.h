@@ -124,7 +124,7 @@
 
 /* switch calls */
 
-#define SIOCSWCFG	0x89b0
+#define SIOCSWCFG	0x89b3
 
 /* Device private ioctl calls */
 

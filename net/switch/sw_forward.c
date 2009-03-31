@@ -100,15 +100,25 @@ __dbg_static inline void sw_skb_xmit(struct sk_buff *skb, struct net_device *dev
 		unsigned char pkt_type) {
 	/* FIXME packets larger that 1500 may break things */
 #ifdef DEBUG
+	/* FIXME: This was commented out by ADI (mtu problems in lacp? Please check) */
+	/*
 	if (skb->len > dev->mtu) {
 		dbg("%s: mtu exceeded on %s len=%d mtu=%d\n",
 				__func__, dev->name, skb->len, dev->mtu);
 		// goto destroy;
 	}
+	*/
 #endif
 
 	if (dev->sw_port) {
 		/* This is a physical port (not a bogus one i.e. vif) */
+		if(dev->lac_port!=NULL)
+		{
+			if(dev->lac_port->actor.state.bmask.aggregation == True)
+			{
+				return;//desi e port fizic, e unul agregat, deci nu ma intereseaza; io vb direct cu agregatorul
+			}
+		}
 		skb->dev = dev;
 
 		/* Prevent packets from being checksummed again on egress.

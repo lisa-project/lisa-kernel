@@ -82,6 +82,8 @@
 #endif
 #endif
 
+#include <linux/if_lac.h> //ADI
+
 struct net_switch_ifcfg {
 	int flags;
 	int access_vlan;
@@ -140,6 +142,8 @@ struct net_switch_ioctl_arg {
 		struct net_switch_usr_vdb_arg varg;
 		int switchport;
 	} ext;
+
+	lac_cmd_t lac_user_cmd;//comanda LAC  ADI
 };
 
 /* Mac Address types (any, static, dynamic) */

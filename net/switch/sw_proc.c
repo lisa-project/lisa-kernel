@@ -245,3 +245,5 @@ void cleanup_switch_proc(void) {
 	remove_proc_entry(SW_PROCFS_VIF, switch_dir);
 	proc_net_remove(&init_net, SW_PROCFS_DIR);
 }
+
+
