@@ -161,7 +161,7 @@ extern La_Timer				first_timer;
 extern La_Timer				*tick_next;
 
 extern void		lac_check_all_links(void);
-extern void		lac_link_check(void *arg);
+extern void		lac_link_check(struct work_struct *work);
 extern int		lac_set_aggregable(unsigned int port_no, Boolean aggregate);
 
 extern void		lac_start_timer(La_Timer *lac_timer, Time exp_time);

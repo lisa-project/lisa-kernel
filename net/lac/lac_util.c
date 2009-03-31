@@ -85,10 +85,10 @@ void lac_register_timer(La_Timer *lac_timer, void (*call_fn)(void *), void *with
 */
 void lac_unregister_timer(La_Timer *lac_timer)
 {
+	La_Timer *in_chain;
+
 	if (lac_timer == NULL)
 		return;
-
-	La_Timer *in_chain;
    
 	in_chain = &first_timer;
 	while (in_chain->next_timer != lac_timer)
@@ -326,9 +326,9 @@ Boolean lac_compute_key(Lac_port *port)
 /* Called from work queue to allow for calling functions that
  * might sleep (such as speed check)
  */
-void lac_link_check(void *arg)
+void lac_link_check(struct work_struct *work)
 {
-	Lac_port	*port = arg;
+	Lac_port	*port = container_of(work, Lac_port, link_check);
 	Lac_aggr	*agg;
 	int			port_link;
 	int			port_duplx;
@@ -418,7 +418,7 @@ void lac_check_all_links(void)
 	Lac_port *p = lac_ports;
 	while(p)
 	{
-		lac_link_check(p);
+		lac_link_check(&p->link_check);
 		p = p->pNext;
 	}
 }

@@ -37,7 +37,7 @@ int add_del_if_by_name(Lac_aggr *lag, char* ifname, int isadd)
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	dev = dev_get_by_name(ifname);
+	dev = dev_get_by_name(&init_net, ifname);
 	if (dev == NULL)
 	{
 		Lac_warn("device not obtained\n");
@@ -120,7 +120,8 @@ void lac_get_sys_params(lac_cmd_t *user_cmd)
 	sys_params.collector_max_delay = la_system.collector_delay_time;
 
 	/* copy to user */
-	copy_to_user((void __user *)user_cmd->param, &sys_params, sizeof(sys_params_t));
+	if (copy_to_user((void __user *)user_cmd->param, &sys_params, sizeof(sys_params_t)))
+		Lac_warn("copy_to_user failed!\n");
 }
 
 /**
@@ -174,8 +175,9 @@ void lac_get_port_params(lac_cmd_t *user_cmd)
 		port_params.part_state = port->partner.state.state;
 
 		/* copy data to user */
-		copy_to_user((void __user *)user_cmd->param + i*sizeof(port_params_t), 
-			&port_params, sizeof(port_params_t));
+		if (copy_to_user((void __user *)user_cmd->param + i*sizeof(port_params_t), 
+			&port_params, sizeof(port_params_t)))
+			Lac_warn("copy_to_user failed!\n");
 		
 		/* go to next port */
 		i++;
@@ -240,7 +242,8 @@ void lac_get_port_by_name(lac_cmd_t *user_cmd)
 			port_params.part_state = port->partner.state.state;
 
 			/* copy data to user */
-			copy_to_user((void __user *)user_cmd->param,&port_params, sizeof(port_params_t));
+			if (copy_to_user((void __user *)user_cmd->param,&port_params, sizeof(port_params_t)))
+				Lac_warn("copy_to_user failed!\n");
 
 			//get out
 			found=1;
@@ -255,7 +258,8 @@ void lac_get_port_by_name(lac_cmd_t *user_cmd)
 	{
 		strncpy(port_params.port_name, name, MAX_PORT_NAME);
 		port_params.port_no = -1;
-		copy_to_user((void __user *)user_cmd->param,&port_params, sizeof(port_params_t));
+		if (copy_to_user((void __user *)user_cmd->param,&port_params, sizeof(port_params_t)))
+			Lac_warn("copy_to_user failed!\n");
 	}
 }
 
@@ -276,8 +280,9 @@ void lac_get_agg_params(lac_cmd_t *user_cmd)
 		ap.ready = agg->ready;
 
 		/* copy data to user */
-		copy_to_user((void __user *)user_cmd->param + i*sizeof(agg_params_t),
-			&ap, sizeof(agg_params_t));
+		if (copy_to_user((void __user *)user_cmd->param + i*sizeof(agg_params_t),
+			&ap, sizeof(agg_params_t)))
+			Lac_warn("copy_to_user failed!\n");
 		
 		i++;
 	}

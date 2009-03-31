@@ -47,7 +47,7 @@ int lac_frame_distribution(struct sk_buff *skb, struct net_device *dev)
 	agg->statistics.tx_packets++;
 	agg->statistics.tx_bytes += skb->len;
 	
-	skb->mac.raw = skb->data;
+	skb_reset_mac_header(skb);
 	skb_pull(skb, ETH_HLEN);
 
 	rcu_read_lock();
@@ -207,7 +207,6 @@ void lac_dev_setup(struct net_device *dev)
 	dev->open = lac_dev_open;
 	dev->change_mtu = lac_change_mtu;
 	dev->destructor = free_netdev;
-	SET_MODULE_OWNER(dev);
  	SET_ETHTOOL_OPS(dev, &lac_ethtool_ops);
 	dev->stop = lac_dev_stop;
 	dev->tx_queue_len = 0;

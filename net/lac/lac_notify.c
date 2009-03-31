@@ -35,7 +35,7 @@ static int lac_device_event(struct notifier_block *unused, unsigned long event, 
 
 	case NETDEV_CHANGE:
 		Lac_warn("lac_device_event: NETDEV_CHANGE\n");
-			schedule_delayed_work(&p->link_check, HZ/10);
+			schedule_work(&p->link_check);
 		break;
 
 	case NETDEV_DOWN:

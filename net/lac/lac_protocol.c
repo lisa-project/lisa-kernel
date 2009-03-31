@@ -1286,16 +1286,17 @@ static Boolean lac_xmit_lacpdu(Lac_port *port)
 	}
 
 	skb->dev = port->dev;
-	skb->mac.raw = skb_put(skb, size);
-	memcpy(skb->mac.raw, Slow_Protocols_Multicast, ETH_ALEN);
-	memcpy(skb->mac.raw + ETH_ALEN, port->dev->dev_addr, ETH_ALEN);
+	skb_put(skb, size);
+	skb_set_mac_header(skb, size);
+	memcpy(skb_mac_header(skb), Slow_Protocols_Multicast, ETH_ALEN);
+	memcpy(skb_mac_header(skb) + ETH_ALEN, port->dev->dev_addr, ETH_ALEN);
 
-	eh = (struct ethhdr *)skb->mac.raw;
+	eh = (struct ethhdr *)skb_mac_header(skb);
 	eh->h_proto = htons(Slow_Protocols_Ethertype);
 
-	skb->nh.raw = skb->mac.raw + 2*ETH_ALEN + 2;
-	memcpy(skb->nh.raw, &pdu, pdu_len);
-	memset(skb->nh.raw + pdu_len, 0xa5, size - pdu_len - 2*ETH_ALEN - 2);
+	skb->network_header = skb_mac_header(skb) + 2*ETH_ALEN + 2;
+	memcpy(skb_network_header(skb), &pdu, pdu_len);
+	memset(skb_network_header(skb) + pdu_len, 0xa5, size - pdu_len - 2*ETH_ALEN - 2);
 	Lac_warn("LACPDU sent on port %d\n\n", port->port_no);
 	dev_queue_xmit(skb);
 	return True;

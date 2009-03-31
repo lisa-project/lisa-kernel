@@ -83,11 +83,11 @@ void dump_packet(const struct sk_buff *skb) {
 	printk(KERN_INFO "dev=%s: proto=0x%hx mac_len=%d "
 			"head=0x%p data=0x%p tail=0x%p end=0x%p mac=0x%p\n",
 			skb->dev->name, ntohs(skb->protocol), skb->mac_len,
-			skb->head, skb->data, skb->tail, skb->end, skb->mac.raw);
+			skb->head, skb->data, skb->tail, skb->end, skb_mac_header(skb));
 	printk("MAC dump: ");
-	if(skb->mac.raw)
+	if(skb_mac_header(skb))
 		for(i = 0; i < skb->mac_len; i++)
-			printk("0x%x ", skb->mac.raw[i]);
+			printk("0x%x ", skb_mac_header(skb)[i]);
 	printk("\nDATA dump: ");
 	if(skb->data)
 		for(i = 0; i < 4; i++)

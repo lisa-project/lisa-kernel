@@ -31,7 +31,7 @@ Boolean lac_get_phy_info(struct net_device *dev, int *port_link, int *port_duplx
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = dev_ethtool(&ifr);
+	err = dev_ethtool(&init_net, &ifr);
 	set_fs(old_fs);
 
 	*port_speed = Interface_100Mb;
@@ -200,7 +200,7 @@ int lac_del_aggr(const char *name)
 	int ret = 0;
 
 	rtnl_lock();
-	dev = __dev_get_by_name(name);
+	dev = __dev_get_by_name(&init_net, name);
 	if (dev == NULL) 
 	{
 		ret =  -ENXIO; 	/* Could not find device */
@@ -380,7 +380,7 @@ struct net_lac_port *new_nlp(struct net_lac_aggr *agg, struct net_device *dev)
 	INIT_LIST_HEAD(&p->list);
 
 	/* init work queue */
-	INIT_WORK(&p->link_check, lac_link_check, p);
+	INIT_WORK(&p->link_check, lac_link_check);
 	
 	return p;
 }
@@ -410,7 +410,7 @@ void del_nlp(struct net_lac_port *p)
 	lac_unregister_timers(p);
 	dev_set_promiscuity(dev, -1);
 	
-	cancel_delayed_work(&p->link_check);
+	cancel_work_sync(&p->link_check);
 
 	/* delete pointer from net_dev structure */
 	rcu_assign_pointer(dev->lac_port, NULL);
@@ -477,7 +477,7 @@ int lac_add_if(struct net_lac_aggr *agg, struct net_device *dev)
 
 	lac_init_port(p);
 
-	schedule_delayed_work(&p->link_check, HZ/10);
+	schedule_work(&p->link_check);
 
 	return 0;
 

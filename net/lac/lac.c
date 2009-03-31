@@ -14,7 +14,8 @@
 #include "lac_debug.h"
 
 int max_aggrs = 1;
-MODULE_PARM(max_aggrs, "1-" __MODULE_STRING(MAX_AGGRS_NO) "i");
+module_param(max_aggrs, int, 1);
+MODULE_PARM_DESC(max_aggrs, "Maximum aggregators");
 
 MODULE_DESCRIPTION("Link Aggregation");
 MODULE_AUTHOR("us");
@@ -67,7 +68,7 @@ static int lac_module_init(void)
 	kernel_thread(thread_monitor_links, NULL, 0);
 	
 	//ADI adaug la switch pe aggr0
-	if((dev = dev_get_by_name("aggr0")) != NULL)//ADI
+	if((dev = dev_get_by_name(&init_net, "aggr0")) != NULL)//ADI
 	{
 		//deci sa initializat aggr0
 		int err;

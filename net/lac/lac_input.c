@@ -14,7 +14,7 @@ void start_lacp(struct net_lac_port *port, struct sk_buff *skb)
 	Lac_info	actor;
 	Lac_info	partner;
 	
-	pdu = (La_Byte *)skb->mac.raw;
+	pdu = (La_Byte *)skb_mac_header(skb);
 #if 0	
 	if(DEB_GET_LAC_RX_PDU(lac_debug_info))
 	{
@@ -213,7 +213,7 @@ int lac_handle_frame(struct net_lac_port *port, struct sk_buff **pskb)
 	if (!memcmp(dest, Slow_Protocols_Multicast, ETH_ALEN) && 
 		eth_hdr(skb)->h_proto == htons((La_Short)Slow_Protocols_Ethertype))
 	{
-		if(skb->mac.raw[Lacpdu_subtype_offset] == LACP_Subtype )
+		if(*(skb_mac_header(skb) + Lacpdu_subtype_offset) == LACP_Subtype )
 		{
 			start_lacp(port, skb);
 			return 1;

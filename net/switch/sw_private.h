@@ -293,19 +293,9 @@ extern int sw_socket_filter(struct sk_buff *, struct net_switch_port *);
 
 
 #if defined(CONFIG_LAC) || defined (CONFIG_LAC_MODULE)
-extern __inline__ int handle_lac(struct sk_buff **pskb);//ADI cred ca putzin inutil
+extern int handle_lac(struct sk_buff **pskb);//ADI cred ca putzin inutil
 #else
 #define handle_lac(skb)	(0)
 #endif
 
 #endif
-
-
-
-
-
-
-
-
-
-
