@@ -7,8 +7,6 @@
 #include <asm/semaphore.h>
 #include <linux/timer.h>
 
-#include <linux/switch.h>
-
 #include "lac_private.h"
 #include "../switch/sw_private.h"
 #include "lac_debug.h"
