@@ -2,7 +2,7 @@
 #include <linux/if.h>
 
 #include "../lac/lac_private.h"
-#include "sw_debug.h"
+#include "sw_private.h"
 
 //ADI New File 
 
