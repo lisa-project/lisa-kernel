@@ -581,7 +581,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	int do_put = 0;
 	unsigned long age_time;
 	char vlan_desc[SW_MAX_VLAN_NAME+1];
-	struct net *net = sock->sk->sk_net;
+	struct net *net = &init_net;
 
 	if (cmd != SIOCSWCFG)
 		return -ENOIOCTLCMD;

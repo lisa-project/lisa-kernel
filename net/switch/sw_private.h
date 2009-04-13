@@ -20,11 +20,10 @@
 #define _SW_PRIVATE_H
 
 #include <linux/netdevice.h>
-#include <linux/list.h>
+#include <linux/rculist.h>
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 #include <linux/net_switch.h>
-#include <asm/semaphore.h>
 #include <asm/atomic.h>
 
 #ifdef DEBUG
