@@ -175,8 +175,8 @@ out:
 /* Almost copy-paste from af_packet.c */
 static void sw_sock_destruct(struct sock *sk) {
 	dbg("sw_sock_destruct, sk=%p\n", sk);
-	BUG_TRAP(!atomic_read(&sk->sk_rmem_alloc));
-	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
+	WARN_ON(atomic_read(&sk->sk_rmem_alloc));
+	WARN_ON(atomic_read(&sk->sk_wmem_alloc));
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		dbg("Attempt to release alive switch socket: %p\n", sk);
@@ -287,7 +287,7 @@ static int sw_sock_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	if(sw_addr->ssw_family != AF_SWITCH)
 		return -EINVAL;
 
-	dev = dev_get_by_name(sock->sk->sk_net, sw_addr->ssw_if_name);
+	dev = dev_get_by_name(&init_net, sw_addr->ssw_if_name);
 	if(dev == NULL)
 		return -ENODEV;
 
@@ -362,7 +362,7 @@ static int sw_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 		if (msg->msg_namelen == sizeof(struct sockaddr_sw))
 			proto = sw_addr->ssw_proto;
 
-		dev = dev_get_by_name(sock->sk->sk_net, sw_addr->ssw_if_name);
+		dev = dev_get_by_name(&init_net, sw_addr->ssw_if_name);
 		if (dev == NULL)
 			return -ENODEV;
 	}
