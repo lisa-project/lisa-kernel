@@ -22,7 +22,6 @@
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
 #include <linux/if_ether.h>
-#include <asm/semaphore.h>
 
 #include "sw_private.h"
 #include "sw_proc.h"
