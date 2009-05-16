@@ -83,12 +83,9 @@ static int sw_addif(struct net_device *dev) {
 	port->sw = &sw;
     port->vlan = 1; /* By default all ports are in vlan 1 */
 	port->desc[0] = '\0';
-	port->speed = SW_SPEED_AUTO;
-	port->duplex = SW_DUPLEX_AUTO;
 	port->flags = SW_PFL_DISABLED;
 	INIT_LIST_HEAD(&port->sock_cdp);
 	INIT_LIST_HEAD(&port->sock_vtp);
-	/* FIXME configure physical characteristics of device (i.e. speed) */
 #ifdef NET_SWITCH_TRUNKDEFAULTVLANS
 	memset(port->forbidden_vlans, 0xff, 512);
 	__sw_allow_default_vlans(port->forbidden_vlans);
@@ -772,16 +769,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		port->desc[SW_MAX_PORT_DESC] = '\0';
 		err = 0;
 		break;
-	case SWCFG_SETSPEED:
-		PORT_GET;
-		port->speed = arg.ext.speed;
-		err = 0;
-		break;
-	case SWCFG_SETDUPLEX:
-		PORT_GET;
-		port->duplex = arg.ext.duplex;
-		err = 0;
-		break;
 	case SWCFG_GETIFCFG:
 		PORT_GET;
 		arg.ext.cfg.flags = port->flags;
@@ -800,8 +787,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 				break;
 			}
 		}
-		arg.ext.cfg.speed = port->speed;
-		arg.ext.cfg.duplex = port->duplex;
 		if(copy_to_user(uarg, &arg, sizeof(arg))) {
 			err = -EFAULT;
 			break;

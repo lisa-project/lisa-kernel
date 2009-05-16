@@ -28,8 +28,6 @@ enum {
 
 	/* Generic switched interface manipulation */
 	SWCFG_SETIFDESC,		/* set interface description */
-	SWCFG_SETSPEED,			/* set port speed parameter */
-	SWCFG_SETDUPLEX,		/* set port duplex parameter */
 
 	/* VDB manipulation */
 	SWCFG_ADDVLAN,			/* add vlan to vlan database */
@@ -81,15 +79,6 @@ enum {
 #define SW_PFL_ADMDISABLED	0x10
 #define SW_PFL_NOSWITCHPORT	0x20
 
-#define SW_SPEED_AUTO		0x01
-#define SW_SPEED_10			0x02
-#define SW_SPEED_100		0x03
-#define SW_SPEED_1000		0x04
-
-#define SW_DUPLEX_AUTO		0x01
-#define SW_DUPLEX_HALF		0x02
-#define SW_DUPLEX_FULL		0x03
-
 #ifdef __KERNEL__
 #include <linux/if.h>
 #else
@@ -109,8 +98,6 @@ struct net_switch_ifcfg {
 	int access_vlan;
 	unsigned char *forbidden_vlans;
 	char *description;
-	int speed;
-	int duplex;
 };
 
 /**
