@@ -95,7 +95,7 @@ int fdb_cleanup_port(struct net_switch_port *port, int addr_type) {
             continue;
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
-		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
+		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
 			if(entry->port == port && (addr_type == SW_FDB_ANY || entry->is_static == addr_type)) {
 				if (!entry->is_static)
 					del_timer(&entry->age_timer);
@@ -123,7 +123,7 @@ int fdb_cleanup_by_type(struct net_switch *sw, int addr_type) {
 	
 	for (i = 0; i < SW_HASH_SIZE; i++) {
         spin_lock_bh(&sw->fdb[i].lock);
-		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
+		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
 			if(addr_type == SW_FDB_ANY || entry->is_static == addr_type) {
 				if (!entry->is_static)
 					del_timer(&entry->age_timer);
@@ -167,7 +167,7 @@ int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int addr_type) {
             continue;
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
-		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
+		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
 			if(entry->vlan == vlan && (addr_type == SW_FDB_ANY || entry->is_static == addr_type)) {
 				if (!entry->is_static)
 					del_timer(&entry->age_timer);
@@ -214,7 +214,7 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 		return ret;
 	/* We found entries; lock for write and delete them */
 	spin_lock_bh(&bucket->lock);
-	list_for_each_entry_rcu(entry, &bucket->entries, lh) {
+	list_for_each_entry_safe(entry, tmp, &bucket->entries, lh) {
 		if((!vlan || entry->vlan == vlan) && (!port || entry->port == port) &&
 				(addr_type = SW_FDB_ANY || entry->is_static == addr_type) &&
 				!memcmp(entry->mac, mac, ETH_ALEN)) {
