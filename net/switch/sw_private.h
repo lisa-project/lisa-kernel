@@ -77,10 +77,6 @@ struct net_switch_port {
 	/* Port description */
 	char desc[SW_MAX_PORT_DESC + 1];
 
-	/* Physical configuration settings */
-	int speed;
-	int duplex;
-
 	/* List heads for switch sockets */
 	struct list_head sock_cdp;
 	struct list_head sock_vtp;
