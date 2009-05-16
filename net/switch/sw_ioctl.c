@@ -499,14 +499,24 @@ static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 	return ret;
 }
 
-int sw_get_vdb(struct swcfgreq *arg) {
+int sw_get_vdb(struct swcfgreq *arg, int vlan_id, char *vlan_desc) {
 	int size = 0;
 	struct net_switch_vdb entry;
-	int vlan;
+	int vlan, min = SW_MIN_VLAN, max = SW_MAX_VLAN;
 
-	for(vlan = SW_MIN_VLAN; vlan <= SW_MAX_VLAN; vlan++) {
+	if (vlan_id) {
+		if (sw_invalid_vlan(vlan_id))
+			return -EINVAL;
+		min = max = vlan_id;
+	}
+
+	for(vlan = min; vlan <= max; vlan++) {
 		rcu_read_lock();
 		if(sw.vdb[vlan] == NULL) {
+			rcu_read_unlock();
+			continue;
+		}
+		if (vlan_desc && strcmp(vlan_desc, sw.vdb[vlan]->name)) {
 			rcu_read_unlock();
 			continue;
 		}
@@ -514,6 +524,27 @@ int sw_get_vdb(struct swcfgreq *arg) {
 		strcpy(entry.name, sw.vdb[vlan]->name);
 		rcu_read_unlock();
 		push_to_user_buf(entry, arg, size);
+	}
+
+	return size;
+}
+
+int sw_getvlanif(struct swcfgreq *arg)
+{
+	int size = 0;
+	int ifindex;
+	struct net_switch_vdb_link *link;
+
+	dbg("sw_getvlanif, vlan=%d\n", arg->vlan);
+
+	if (sw_invalid_vlan(arg->vlan))
+		return -EINVAL;
+	if (sw.vdb[arg->vlan] == NULL)
+		return -ENOENT;
+
+	list_for_each_entry(link, &sw.vdb[arg->vlan]->non_trunk_ports, lh) {
+		ifindex = link->port->dev->ifindex;
+		push_to_user_buf(ifindex, arg, size);
 	}
 
 	return size;
@@ -846,7 +877,14 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = fdb_cleanup_by_type(&sw, SW_FDB_DYN);
 		break;
 	case SWCFG_GETVDB:
-		err = sw_get_vdb(&arg);
+		if (arg.ext.vlan_desc != NULL &&
+				!strncpy_from_user(vlan_desc, arg.ext.vlan_desc, SW_MAX_VLAN_NAME)) {
+			err = -EFAULT;
+			break;
+		}
+		vlan_desc[SW_MAX_VLAN_NAME] = '\0';
+		err = sw_get_vdb(&arg, arg.vlan, arg.ext.vlan_desc == NULL ?
+				NULL : vlan_desc);
 		break;
 	case SWCFG_SETSWPORT:
 		PORT_GET;
@@ -854,6 +892,9 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_GETIFLIST:
 		err = sw_getiflist(&arg);
+		break;
+	case SWCFG_GETVLANIFS:
+		err = sw_getvlanif(&arg);
 		break;
 	}
 

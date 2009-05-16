@@ -34,6 +34,7 @@ enum {
 	SWCFG_DELVLAN,			/* delete vlan from vlan database */
 	SWCFG_RENAMEVLAN,		/* rename vlan from vlan database */
 	SWCFG_GETVDB,			/* copy the whole vlan database to userspace */
+	SWCFG_GETVLANIFS,		/* get a list of interfaces in a specific vlan */
 
 	/* Vlan-related switched interface manipulation */
 	SWCFG_ADDVLANPORT,		/* add a port to a vlan (trunk mode) */
