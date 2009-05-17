@@ -113,7 +113,6 @@ static int sw_addif(struct net_device *dev) {
 int sw_delif(struct net_device *dev) {
 	struct net_switch_port *port;
 
-	printk(KERN_INFO "%s: dev=%p\n", __func__, dev);
 	if((port = rcu_dereference(dev->sw_port)) == NULL)
 		return -EINVAL;
 
@@ -122,9 +121,7 @@ int sw_delif(struct net_device *dev) {
 	 */
 	rtnl_lock();
 	dev_set_promiscuity(dev, -1);
-	printk(KERN_INFO "Disabled promiscuity on device %s\n", dev->name);
 	rtnl_unlock();
-	printk(KERN_INFO "after rtnl_unlock()\n");
 
 	/* Now let all incoming queue processors know that frames on this port
 	   are not handled by the switch anymore.
@@ -139,29 +136,22 @@ int sw_delif(struct net_device *dev) {
 	   that reference this port, so we have to wait for all running
 	   instances to finish.
 	 */
-	printk(KERN_INFO "calling synchronize_sched\n");
 	synchronize_sched();
 	/* Now nobody can add references to this port, so we can safely clean
 	   up all existing references from the fdb
 	 */
-	printk(KERN_INFO "fdb_cleanup_port\n");
 	fdb_cleanup_port(port, SW_FDB_ANY);
-	printk(KERN_INFO "after fdb_cleanup_port\n");
 	/* Clean up vlan references: if the port was non-trunk, remove it from
 	   its single vlan; otherwise use the disallowed vlans bitmap to remove
 	   it from all vlans
 	 */
 	if(port->flags & SW_PFL_TRUNK) {
-		printk(KERN_INFO "sw_remove_from_vlans\n");
 		__sw_remove_from_vlans(port);
 	} else {
-		printk(KERN_INFO "sw_vdb_del_port\n");
 		sw_vdb_del_port(port->vlan, port);
 	}
-	printk(KERN_INFO "removing port from list\n");
 	list_del_rcu(&port->lh);
 	/* free port memory and release interface */
-	printk(KERN_INFO "freeing memory\n");
 	kfree(port->forbidden_vlans);
 	kfree(port);
 	dev_put(dev);
