@@ -112,6 +112,7 @@ static int sw_addif(struct net_device *dev) {
  */
 int sw_delif(struct net_device *dev) {
 	struct net_switch_port *port;
+	int do_unlock;
 
 	if((port = rcu_dereference(dev->sw_port)) == NULL)
 		return -EINVAL;
@@ -119,9 +120,10 @@ int sw_delif(struct net_device *dev) {
 	/* First disable promiscuous mode, so that there be less chances to
 	   still receive packets on this port
 	 */
-	rtnl_lock();
+	do_unlock = rtnl_trylock();
 	dev_set_promiscuity(dev, -1);
-	rtnl_unlock();
+	if (do_unlock)
+		rtnl_unlock();
 
 	/* Now let all incoming queue processors know that frames on this port
 	   are not handled by the switch anymore.
