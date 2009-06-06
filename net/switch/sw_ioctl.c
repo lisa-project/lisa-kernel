@@ -48,7 +48,7 @@ static inline void __sw_allow_default_vlans(unsigned char *forbidden_vlans) {
 static inline void __sw_remove_from_vlans(struct net_switch_port *port) {
 	int n, vlan = 0;
 	unsigned char mask, *bmp = port->forbidden_vlans;
-	for(n = 0; n < 512; n++, bmp++) {
+	for(n = 0; n < SW_VLAN_BMP_NO; n++, bmp++) {
 		for(mask = 1; mask; mask <<= 1, vlan++) {
 			if(*bmp & mask)
 				continue;
@@ -72,10 +72,14 @@ static int sw_addif(struct net_device *dev) {
 		 */
 		return -EBUSY;
 	}
-	if((port = kmalloc(sizeof(struct net_switch_port), GFP_KERNEL)) == NULL)
+	if((port = kzalloc(sizeof(struct net_switch_port), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	memset(port, 0, sizeof(struct net_switch_port));
-	if((port->forbidden_vlans = kmalloc(SW_VLAN_BMP_NO, GFP_KERNEL)) == NULL) {
+	if((port->mrouters = kzalloc(SW_VLAN_BMP_NO, GFP_KERNEL)) == NULL) {
+		kfree(port);
+		return -ENOMEM;
+	}
+	if((port->forbidden_vlans = kzalloc(SW_VLAN_BMP_NO, GFP_KERNEL)) == NULL) {
+		kfree(port->mrouters);
 		kfree(port);
 		return -ENOMEM;
 	}
@@ -87,10 +91,9 @@ static int sw_addif(struct net_device *dev) {
 	INIT_LIST_HEAD(&port->sock_cdp);
 	INIT_LIST_HEAD(&port->sock_vtp);
 #ifdef NET_SWITCH_TRUNKDEFAULTVLANS
-	memset(port->forbidden_vlans, 0xff, 512);
+	memset(port->forbidden_vlans, 0xff, SW_VLAN_BMP_NO);
 	__sw_allow_default_vlans(port->forbidden_vlans);
 #else
-	memset(port->forbidden_vlans, 0, 512);
 	sw_forbid_vlan(port->forbidden_vlans, 0);
 	sw_forbid_vlan(port->forbidden_vlans, 4095);
 #endif
@@ -154,6 +157,7 @@ int sw_delif(struct net_device *dev) {
 	}
 	list_del_rcu(&port->lh);
 	/* free port memory and release interface */
+	kfree(port->mrouters);
 	kfree(port->forbidden_vlans);
 	kfree(port);
 	dev_put(dev);
@@ -167,7 +171,7 @@ int sw_delif(struct net_device *dev) {
 static inline void __sw_add_to_vlans(struct net_switch_port *port) {
 	int n, vlan = 0;
 	unsigned char mask, *bmp = port->forbidden_vlans;
-	for(n = 0; n < 512; n++, bmp++) {
+	for(n = 0; n < SW_VLAN_BMP_NO; n++, bmp++) {
 		for(mask = 1; mask; mask <<= 1, vlan++) {
 			if(*bmp & mask)
 				continue;
@@ -321,7 +325,7 @@ static int sw_set_port_forbidden_vlans(struct net_switch_port *port,
 	sw_forbid_vlan(forbidden_vlans, 0);
 	sw_forbid_vlan(forbidden_vlans, 4095);
 	if(port->flags & SW_PFL_TRUNK) {
-		for(n = 0; n < 512; n++, old++, new++) {
+		for(n = 0; n < SW_VLAN_BMP_NO; n++, old++, new++) {
 			for(mask = 1; mask; mask <<= 1, vlan++) {
 				if(!((*old ^ *new) & mask))
 					continue;
@@ -332,7 +336,7 @@ static int sw_set_port_forbidden_vlans(struct net_switch_port *port,
 			}
 		}
 	}
-	memcpy(port->forbidden_vlans, forbidden_vlans, 512);
+	memcpy(port->forbidden_vlans, forbidden_vlans, SW_VLAN_BMP_NO);
 	return 0;
 }
 
@@ -342,7 +346,7 @@ static int sw_set_port_forbidden_vlans(struct net_switch_port *port,
  */
 static int sw_add_port_forbidden_vlans(struct net_switch_port *port,
 		unsigned char *forbidden_vlans) {
-	unsigned char bmp[512];
+	unsigned char bmp[SW_VLAN_BMP_NO];
 	unsigned char *p = bmp;
 	unsigned char *new = forbidden_vlans;
 	unsigned char *old = port->forbidden_vlans;
@@ -353,7 +357,7 @@ static int sw_add_port_forbidden_vlans(struct net_switch_port *port,
 	if (port->flags & SW_PFL_NOSWITCHPORT)
 		return -EACCES;
 
-	for(n = 0; n < 512; n++, old++, new++, p++)
+	for(n = 0; n < SW_VLAN_BMP_NO; n++, old++, new++, p++)
 		*p = *old & *new;
 	return sw_set_port_forbidden_vlans(port, bmp);
 }
@@ -364,7 +368,7 @@ static int sw_add_port_forbidden_vlans(struct net_switch_port *port,
  */
 static int sw_del_port_forbidden_vlans(struct net_switch_port *port,
 		unsigned char *forbidden_vlans) {
-	unsigned char bmp[512];
+	unsigned char bmp[SW_VLAN_BMP_NO];
 	unsigned char *p = bmp;
 	unsigned char *new = forbidden_vlans;
 	unsigned char *old = port->forbidden_vlans;
@@ -375,7 +379,7 @@ static int sw_del_port_forbidden_vlans(struct net_switch_port *port,
 	if (port->flags & SW_PFL_NOSWITCHPORT)
 		return -EACCES;
 
-	for(n = 0; n < 512; n++, old++, new++, p++)
+	for(n = 0; n < SW_VLAN_BMP_NO; n++, old++, new++, p++)
 		*p = *old | ~*new;
 	return sw_set_port_forbidden_vlans(port, bmp);
 }
@@ -578,6 +582,11 @@ int sw_getiflist(struct swcfgreq *arg)
 	return size;
 }
 
+int sw_getmrouters(struct swcfgreq *arg)
+{
+	return 0;
+}
+
 #define DEV_GET if(1) {\
 	if ((dev = dev_get_by_index(net, arg.ifindex)) == NULL) {\
 		err = -ENODEV;\
@@ -758,6 +767,10 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		sw_res_port_flag(port, SW_PFL_ADMDISABLED);
 		sw_enable_port(port);
 		break;
+	case SWCFG_ADDMROUTER:
+		PORT_GET;
+		err = sw_set_mrouter(port->mrouters, arg.vlan);
+		break;
 	case SWCFG_SETTRUNKVLANS:
 		PORT_GET;
 		if(copy_from_user(bitmap, arg.ext.bmp, SW_VLAN_BMP_NO)) {
@@ -887,6 +900,9 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_GETVLANIFS:
 		err = sw_getvlanif(&arg);
+		break;
+	case SWCFG_GETMROUTERS:
+		err = sw_getmrouters(&arg);
 		break;
 	}
 
