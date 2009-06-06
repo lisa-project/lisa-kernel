@@ -201,7 +201,7 @@ __dbg_static int sw_handle_frame(struct net_switch_port *port,
 
 
 	/* Update the fdb */
-	fdb_learn(skb_mac_header(skb) + 6, port, skb_e.vlan, SW_FDB_DYN, 0);
+	fdb_learn(skb_mac_header(skb) + 6, port, skb_e.vlan, SW_FDB_MAC_DYNAMIC);
 
 	sw_forward(port, skb, &skb_e);
 	*ret = NET_RX_SUCCESS;

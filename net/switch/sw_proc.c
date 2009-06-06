@@ -130,7 +130,7 @@ static int proc_read_mac(char *page, char **start,
 				"%12s  %4d  %s\n",
 				entry->mac[0], entry->mac[1], entry->mac[2],
 				entry->mac[3], entry->mac[4], entry->mac[5],
-				(entry->is_static)? "Static": "Dynamic",
+				(entry->type & SW_FDB_STATIC)? "Static": "Dynamic",
 				entry->vlan,
 				entry->port->dev->name
 				);
