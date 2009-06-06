@@ -45,6 +45,8 @@ enum {
 	SWCFG_ADDTRUNKVLANS,	/* add ports to the bitmap of forbidden trunk ports */
 	SWCFG_DELTRUNKVLANS,	/* remove ports from the bitmap of forbidden trunk ports */
 	SWCFG_SETTRUNKVLANS,	/* set the bitmap of forbidden trunk ports */
+	SWCFG_ADDMROUTER,		/* set a port as mrouter on a vlan  */
+	SWCFG_GETMROUTERS,		/* get a list of mrouters */
 
 	/* FDB manipulation */
 	SWCFG_GETMAC,			/* fetch mac addresses from the fdb */
@@ -195,10 +197,18 @@ struct swcfgreq {
 #define sw_is_default_vlan(vlan) \
 	((vlan) == 1 || ((vlan) >= 1002 && (vlan) <= 1005))
 
-#define sw_allow_vlan(bitmap, vlan) ((bitmap)[(vlan) / 8] &= ~(1 << ((vlan) % 8)))
-#define sw_forbid_vlan(bitmap, vlan) ((bitmap)[(vlan) / 8] |= (1 << ((vlan) % 8)))
-#define sw_forbidden_vlan(bitmap, vlan) ((bitmap)[(vlan) / 8] & (1 << ((vlan) % 8)))
-#define sw_allowed_vlan(bitmap, vlan) (!sw_forbidden_vlan(bitmap, vlan))
+#define sw_bitmap_reset(bitmap, offset) ((bitmap)[(offset) / 8] &= ~(1 << ((offset) % 8)))
+#define sw_bitmap_set(bitmap, offset) 	((bitmap)[(offset) / 8] |= (1 << ((offset) % 8)))
+#define sw_bitmap_test(bitmap, offset) 	((bitmap)[(offset) / 8] & (1 << ((offset) % 8)))
+
+#define sw_allow_vlan(bitmap, vlan) 	(sw_bitmap_reset(bitmap, vlan))
+#define sw_forbid_vlan(bitmap, vlan) 	(sw_bitmap_set(bitmap, vlan))
+#define sw_forbidden_vlan(bitmap, vlan) (sw_bitmap_test(bitmap, vlan))
+#define sw_allowed_vlan(bitmap, vlan) 	(!sw_bitmap_test(bitmap, vlan))
+
+#define sw_set_mrouter(bitmap, vlan) 	(sw_bitmap_set(bitmap, vlan))
+#define sw_reset_mrouter(bitmap, vlan) 	(sw_bitmap_reset(bitmap, vlan))
+#define sw_is_mrouter(bitmap, vlan)		(sw_bitmap_test(bitmap, vlan))
 
 /* Maximum length of port description */
 #define SW_MAX_PORT_DESC	31
