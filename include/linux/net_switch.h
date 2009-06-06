@@ -170,10 +170,18 @@ struct swcfgreq {
 	} buf;
 };
 
-/* Mac Address types (any, static, dynamic) */
-#define SW_FDB_DYN	0
-#define SW_FDB_STATIC 1
-#define SW_FDB_ANY 2
+/* FDB entry type flags */
+#define SW_FDB_STATIC 0x01
+#define SW_FDB_IGMP   0x02
+#define SW_FDB_ANY    0xFF
+
+/* Possible types of FDB entries. */
+enum {
+	SW_FDB_MAC_DYNAMIC,
+	SW_FDB_MAC_STATIC = SW_FDB_STATIC,
+	SW_FDB_IGMP_DYNAMIC = SW_FDB_IGMP,
+	SW_FDB_IGMP_STATIC = SW_FDB_IGMP | SW_FDB_STATIC,
+};
 
 /* Minimum number a vlan may have */
 #define SW_MIN_VLAN 1

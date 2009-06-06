@@ -80,7 +80,7 @@ static void sw_timer_add(struct timer_list *timer,
    change it. While holding the lock search for the entry again to
    avoid races.
  */
-int fdb_cleanup_port(struct net_switch_port *port, int addr_type) {
+int fdb_cleanup_port(struct net_switch_port *port, int entry_type) {
     struct net_switch *sw = port->sw;
     struct net_switch_fdb_entry *entry, *tmp;
 	LIST_HEAD(del_list);
@@ -88,7 +88,7 @@ int fdb_cleanup_port(struct net_switch_port *port, int addr_type) {
 	
 	for (i = 0; i < SW_HASH_SIZE; i++) {
 		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
-			if(entry->port == port && (addr_type == SW_FDB_ANY || entry->is_static == addr_type))
+			if(entry->port == port && (entry_type == SW_FDB_ANY || entry->type == entry_type))
                 break;
 		}
         if(&entry->lh == &sw->fdb[i].entries)
@@ -96,8 +96,8 @@ int fdb_cleanup_port(struct net_switch_port *port, int addr_type) {
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(entry->port == port && (addr_type == SW_FDB_ANY || entry->is_static == addr_type)) {
-				if (!entry->is_static)
+			if(entry->port == port && (entry_type == SW_FDB_ANY || entry->type == entry_type)) {
+				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
 				list_add(&entry->lh, &del_list);
@@ -115,8 +115,8 @@ int fdb_cleanup_port(struct net_switch_port *port, int addr_type) {
 	return ret;
 }
 
-/* Walk the fdb and delete all entries by addr_type. */
-int fdb_cleanup_by_type(struct net_switch *sw, int addr_type) {
+/* Walk the fdb and delete all entries by type. */
+int fdb_cleanup_by_type(struct net_switch *sw, int entry_type) {
     struct net_switch_fdb_entry *entry, *tmp;
 	LIST_HEAD(del_list);
     int i, ret = 0;
@@ -124,8 +124,8 @@ int fdb_cleanup_by_type(struct net_switch *sw, int addr_type) {
 	for (i = 0; i < SW_HASH_SIZE; i++) {
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(addr_type == SW_FDB_ANY || entry->is_static == addr_type) {
-				if (!entry->is_static)
+			if(entry_type == SW_FDB_ANY || entry->type == entry_type) {
+				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
 				list_add(&entry->lh, &del_list);
@@ -153,14 +153,14 @@ int fdb_cleanup_by_type(struct net_switch *sw, int addr_type) {
    change it. While holding the lock search for the entry again to
    avoid races.
  */
-int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int addr_type) {
+int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int entry_type) {
     struct net_switch_fdb_entry *entry, *tmp;
 	LIST_HEAD(del_list);
     int i, ret = 0;
 	
 	for (i = 0; i < SW_HASH_SIZE; i++) {
 		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
-			if(entry->vlan == vlan && (addr_type == SW_FDB_ANY || entry->is_static == addr_type))
+			if(entry->vlan == vlan && (entry_type == SW_FDB_ANY || entry->type == entry_type))
                 break;
 		}
         if(&entry->lh == &sw->fdb[i].entries)
@@ -168,8 +168,8 @@ int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int addr_type) {
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(entry->vlan == vlan && (addr_type == SW_FDB_ANY || entry->is_static == addr_type)) {
-				if (!entry->is_static)
+			if(entry->vlan == vlan && (entry_type == SW_FDB_ANY || entry->type == entry_type)) {
+				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
 				list_add(&entry->lh, &del_list);
@@ -198,7 +198,7 @@ int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int addr_type) {
    avoid races.
  */
 int fdb_del(struct net_switch *sw, unsigned char *mac,
-		struct net_switch_port *port, int vlan, int addr_type) {
+		struct net_switch_port *port, int vlan, int entry_type) {
 	struct net_switch_fdb_entry *entry, *tmp;
 	LIST_HEAD(del_list);
 	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(mac)];
@@ -206,7 +206,7 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 
 	list_for_each_entry_rcu(entry, &bucket->entries, lh) {
 		if((!vlan || entry->vlan == vlan) && (!port || entry->port == port) &&
-				(addr_type = SW_FDB_ANY || entry->is_static == addr_type) &&
+				(entry_type = SW_FDB_ANY || entry->type == entry_type) &&
 				!memcmp(entry->mac, mac, ETH_ALEN))
 			break;
 	}
@@ -216,9 +216,9 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 	spin_lock_bh(&bucket->lock);
 	list_for_each_entry_safe(entry, tmp, &bucket->entries, lh) {
 		if((!vlan || entry->vlan == vlan) && (!port || entry->port == port) &&
-				(addr_type = SW_FDB_ANY || entry->is_static == addr_type) &&
+				(entry_type = SW_FDB_ANY || entry->type == entry_type) &&
 				!memcmp(entry->mac, mac, ETH_ALEN)) {
-			if (!entry->is_static)
+			if (!(entry->type & SW_FDB_STATIC))
 				del_timer(&entry->age_timer);
 			list_del_rcu(&entry->lh);
 			list_add(&entry->lh, &del_list);
@@ -238,7 +238,7 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 static void __fdb_change_to_static(struct net_switch_fdb_entry *entry) {
 	local_bh_disable();
 	del_timer(&entry->age_timer);
-	entry->is_static = SW_FDB_STATIC;
+	entry->type |= SW_FDB_STATIC;
 	local_bh_enable();
 }
 
@@ -274,20 +274,20 @@ static inline int __fdb_learn(struct net_switch_bucket *bucket,
    softirqs disabled
  */
 int fdb_learn(unsigned char *mac, struct net_switch_port *port,
-		int vlan, int is_static, int is_mcast) {
+		int vlan, int entry_type) {
 	struct net_switch_bucket *bucket = &port->sw->fdb[sw_mac_hash(mac)];
 	struct net_switch_fdb_entry *entry;
 
 	if(is_l2_mac(mac))
 		return -EINVAL;
 
-	if(__fdb_learn(bucket, mac, is_mcast ? port : NULL, vlan, &entry)) {
+	if(__fdb_learn(bucket, mac, (entry_type & SW_FDB_IGMP) ? port : NULL, vlan, &entry)) {
 		/* we found a matching entry */
-		if (entry->is_static)
+		if ((entry->type & SW_FDB_STATIC))
 			return -EBUSY; /* don't modify a static fdb entry */
-		entry->port = port; /* FIXME this should be atomic ??? */
+		entry->port = port;
 		entry->stamp = jiffies;
-		if (is_static && !entry->is_static) 
+		if (entry_type & SW_FDB_STATIC)
 			__fdb_change_to_static(entry);
 		return 0;
 	}
@@ -296,13 +296,13 @@ int fdb_learn(unsigned char *mac, struct net_switch_port *port,
 	   again, because someone might have added it in the meantime.
 	 */
 	spin_lock_bh(&bucket->lock);
-	if(__fdb_learn(bucket, mac, is_mcast ? port : NULL, vlan, &entry)) {
+	if(__fdb_learn(bucket, mac, (entry_type & SW_FDB_IGMP) ? port : NULL, vlan, &entry)) {
 		/* we found a matching entry */
-		if (entry->is_static)
+		if ((entry->type & SW_FDB_STATIC))
 			return -EBUSY;
 		entry->port = port;
 		entry->stamp = jiffies;
-		if (is_static && !entry->is_static)
+		if (entry_type & SW_FDB_STATIC)
 			__fdb_change_to_static(entry);
 		spin_unlock_bh(&bucket->lock);
 		return 0;
@@ -324,8 +324,8 @@ int fdb_learn(unsigned char *mac, struct net_switch_port *port,
 	entry->port = port;
 	entry->stamp = jiffies;
 	entry->bucket = bucket;
-	entry->is_static = is_static;
-	if (!entry->is_static)  
+	entry->type = entry_type;
+	if (!(entry->type & SW_FDB_STATIC))
 		sw_timer_add(&entry->age_timer, sw_age_timer_expired,
 				(unsigned long)entry, entry->stamp + sw_age_time(entry));
 	/* FIXME smp_wmb() here ?? */
