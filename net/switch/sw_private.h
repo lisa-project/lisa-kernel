@@ -74,6 +74,11 @@ struct net_switch_port {
 	 */
 	unsigned char *forbidden_vlans;
 
+	/* Bitmap for mrouter ports per vlan.
+	   512 * 8 bits = 4096 bits => 4096 vlans
+	 */
+	unsigned char *mrouters;
+
 	/* Port description */
 	char desc[SW_MAX_PORT_DESC + 1];
 
