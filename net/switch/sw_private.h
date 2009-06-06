@@ -112,7 +112,6 @@ struct net_switch {
 	/* Vlan virtual interfaces */
 	struct list_head vif[SW_VIF_HASH_SIZE];
 	
-	
 	/* Cache of forwarding database entries */
 	struct kmem_cache *fdb_cache;
 
@@ -156,7 +155,7 @@ struct net_switch_vdb_link {
 struct net_switch_fdb_entry {
 	struct list_head lh;
 	unsigned char mac[ETH_ALEN];
-	int is_static;
+	int type;
 	int vlan;
 	struct net_switch_port *port;
 	struct net_switch_bucket *bucket;
@@ -205,7 +204,7 @@ extern void sw_fdb_init(struct net_switch *);
 extern int fdb_cleanup_port(struct net_switch_port *, int);
 extern int fdb_cleanup_vlan(struct net_switch *, int, int);
 extern int fdb_cleanup_by_type(struct net_switch *, int);
-extern int fdb_learn(unsigned char *, struct net_switch_port *, int, int, int);
+extern int fdb_learn(unsigned char *, struct net_switch_port *, int, int);
 extern int fdb_del(struct net_switch *, unsigned char *,
 		struct net_switch_port *, int, int);
 extern int fdb_lookup(struct net_switch_bucket *, unsigned char *,

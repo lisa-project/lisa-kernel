@@ -197,7 +197,7 @@ static int sw_set_port_trunk(struct net_switch_port *port, int trunk) {
 		sw_set_port_flag_rcu(port, SW_PFL_DROPALL);
 		__sw_remove_from_vlans(port);
 		sw_res_port_flag(port, SW_PFL_TRUNK);
-		fdb_cleanup_port(port, SW_FDB_DYN);
+		fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
 		status = sw_vdb_add_port(port->vlan, port);
 #if NET_SWITCH_NOVLANFORIF == 2
 		if(status)
@@ -218,7 +218,7 @@ static int sw_set_port_trunk(struct net_switch_port *port, int trunk) {
 		sw_vdb_del_port(port->vlan, port);
 		sw_set_port_flag(port, SW_PFL_TRUNK);
 		sw_res_port_flag(port, SW_PFL_ACCESS);
-		fdb_cleanup_port(port, SW_FDB_DYN);
+		fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
 		__sw_add_to_vlans(port);
 		/* Make sure it was not disabled by assigning a non-existent vlan */
 		sw_enable_port(port);
@@ -281,7 +281,7 @@ static int sw_set_switchport(struct net_switch_port *port, int switchport) {
 	        __sw_remove_from_vlans(port);
 		else
 			sw_vdb_del_port(port->vlan, port);
-		fdb_cleanup_port(port, SW_FDB_DYN);
+		fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
 		/* FIXME FIXME FIXME
 		   - scoaterea portului din vlan-uri opreste flood-ul catre
 		     portul respectiv
@@ -446,13 +446,14 @@ static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 	int vlan = arg->vlan;
 
 	list_for_each_entry_rcu(entry, &sw.fdb[hash_pos].entries, lh) {
+		/* FIXME: do we need to filter out IGMP membership entries here? */
 		if (cmp_mac && memcmp(arg->ext.mac.addr, entry->mac, ETH_ALEN))
 			continue;
 		if (vlan && vlan != entry->vlan)
 			continue;
 		if (port && port != entry->port)
 			continue;
-		if (arg->ext.mac.type != SW_FDB_ANY && arg->ext.mac.type != entry->is_static)
+		if (arg->ext.mac.type != SW_FDB_ANY && arg->ext.mac.type != entry->type)
 			continue;
 		if (len + sizeof(struct net_switch_mac) > arg->buf.size) {
 			dbg("sw_get_mac_loop: insufficient buffer space\n");
@@ -460,7 +461,7 @@ static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 			break;
 		}
 		memcpy(mac.addr, entry->mac, ETH_ALEN);
-		mac.type = entry->is_static;
+		mac.type = entry->type;
 		mac.vlan = entry->vlan;
 		mac.ifindex = entry->port->dev->ifindex;
 		rcu_read_unlock();
@@ -692,7 +693,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_CLEARMACINT:
 		PORT_GET;
-		fdb_cleanup_port(port, SW_FDB_DYN);
+		fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
 		err = 0;
 		break;
 	case SWCFG_SETAGETIME:
@@ -715,7 +716,12 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		break;
 	case SWCFG_MACSTATIC:
 		PORT_GET;
-		err = fdb_learn(arg.ext.mac.addr, port, arg.vlan, SW_FDB_STATIC, is_mcast_mac(arg.ext.mac.addr));
+		/* FIXME: do we need to add multicast mac addresses from here ? */
+		if (is_mcast_mac(arg.ext.mac.addr)) {
+			err = -EINVAL;
+			break;
+		}
+		err = fdb_learn(arg.ext.mac.addr, port, arg.vlan, SW_FDB_STATIC);
 		break;
 	case SWCFG_DELMACSTATIC:
 		PORT_GET;
@@ -869,17 +875,17 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			PORT_GET;
 	
 		if (port) {
-			err = fdb_cleanup_port(port, SW_FDB_DYN);
+			err = fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
 			break;
 		}	
 		if (arg.vlan) {
-			err = fdb_cleanup_vlan(&sw, arg.vlan, SW_FDB_DYN);
+			err = fdb_cleanup_vlan(&sw, arg.vlan, SW_FDB_MAC_DYNAMIC);
 			break;
 		}
 		if (!is_null_mac(arg.ext.mac.addr))
-			err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_DYN);
+			err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_MAC_DYNAMIC);
 		else 
-			err = fdb_cleanup_by_type(&sw, SW_FDB_DYN);
+			err = fdb_cleanup_by_type(&sw, SW_FDB_MAC_DYNAMIC);
 		break;
 	case SWCFG_GETVDB:
 		if (arg.ext.vlan_desc != NULL &&
