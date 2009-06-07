@@ -141,6 +141,16 @@ struct net_switch_dev {
 	int vlan; /* only used for VIFs */
 };
 
+/**
+ * Mrouter list query result
+ *
+ * Only used to fill userspace buffer on ioctl() queuries.
+ */
+struct net_switch_mrouter {
+	int ifindex;
+	int vlan;
+};
+
 struct swcfgreq {
 	int cmd;
 	int ifindex;
