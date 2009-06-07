@@ -144,7 +144,7 @@ struct net_switch_dev {
 /**
  * Mrouter list query result
  *
- * Only used to fill userspace buffer on ioctl() queuries.
+ * Only used to fill userspace buffer on ioctl() queries.
  */
 struct net_switch_mrouter {
 	int ifindex;
