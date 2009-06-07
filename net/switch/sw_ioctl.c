@@ -594,17 +594,18 @@ int sw_getmrouters(struct swcfgreq *arg)
 		tmp.ifindex = port->dev->ifindex;
 		if(!port->mrouters)
 			continue;
-		for(i = 0; i < SW_VLAN_BMP_NO; i++){
+		for(i = 0; i < SW_VLAN_BMP_NO; i++) {
 			if(!port->mrouters[i])
 				continue;
 			tmp.vlan = i*8;
-			for(mask = 1; mask; mask <<= 1, tmp.vlan++){
-				if((port->mrouters[i] & mask)){
+			for(mask = 1; mask; mask <<= 1, tmp.vlan++) {
+				if((port->mrouters[i] & mask)) {
 					push_to_user_buf(tmp, arg, size);
+					dbg("%s: adding (ifindex, vlan) = (%d, %d)\n",
+							__func__, tmp.ifindex, tmp.vlan);
 				}
 			}
 		}
-		dbg("%s: (ifindex, vlan) = (%d, %d)\n", __func__, tmp.ifindex, tmp.vlan);
 	}
 	dbg("%s: returning %d\n", __func__, size);
 	return size;
