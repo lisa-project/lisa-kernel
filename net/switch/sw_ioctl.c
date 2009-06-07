@@ -585,7 +585,29 @@ int sw_getiflist(struct swcfgreq *arg)
 
 int sw_getmrouters(struct swcfgreq *arg)
 {
-	return 0;
+	struct net_switch_port *port;
+	struct net_switch_mrouter tmp;
+	unsigned char mask;
+	int i, size = 0;
+
+	list_for_each_entry(port, &sw.ports, lh) {
+		tmp.ifindex = port->dev->ifindex;
+		if(!port->mrouters)
+			continue;
+		for(i = 0; i < SW_VLAN_BMP_NO; i++){
+			if(!port->mrouters[i])
+				continue;
+			tmp.vlan = i*8;
+			for(mask = 1; mask; mask <<= 1, tmp.vlan++){
+				if((port->mrouters[i] & mask)){
+					push_to_user_buf(tmp, arg, size);
+				}
+			}
+		}
+		dbg("%s: (ifindex, vlan) = (%d, %d)\n", __func__, tmp.ifindex, tmp.vlan);
+	}
+	dbg("%s: returning %d\n", __func__, size);
+	return size;
 }
 
 #define DEV_GET if(1) {\
