@@ -17,8 +17,11 @@
  */
 
 #include "sw_private.h"
+#include <linux/ip.h>
+#include <linux/igmp.h>
 
-__dbg_static inline void add_vlan_tag(struct sk_buff *skb, int vlan) {
+static __inline__ void add_vlan_tag(struct sk_buff *skb, int vlan)
+{
 	int nhead = (ETH_HLEN + VLAN_TAG_BYTES) - (skb->data - skb->head);
 	
 	dbg("%s: head=%p data=%p mac.raw=%p nh.raw=%p h.raw=%p csum=%x "
@@ -84,20 +87,23 @@ __dbg_static inline void add_vlan_tag(struct sk_buff *skb, int vlan) {
 			skb->csum);
 }
 
-__dbg_static inline void strip_vlan_tag(struct sk_buff *skb) {
+static __inline__ void strip_vlan_tag(struct sk_buff *skb)
+{
 	memmove(skb_mac_header(skb)+VLAN_TAG_BYTES, skb_mac_header(skb), 2 * ETH_ALEN);
 	skb->mac_header += VLAN_TAG_BYTES;
 	skb_pull(skb, VLAN_TAG_BYTES);
 	skb->protocol = *(short *)(skb_mac_header(skb) + ETH_HLEN - 2);
 }
 
-__dbg_static inline void __strip_vlan_tag(struct sk_buff *skb, int vlan) {
+static __inline__ void __strip_vlan_tag(struct sk_buff *skb, int vlan)
+{
 	strip_vlan_tag(skb);
 }
 
 /* FIXME: pkt_type may be PACKET_MULTICAST */
-__dbg_static inline void sw_skb_xmit(struct sk_buff *skb, struct net_device *dev,
-		unsigned char pkt_type) {
+static __inline__ void sw_skb_xmit(struct sk_buff *skb, struct net_device *dev,
+		unsigned char pkt_type)
+{
 	/* FIXME packets larger that 1500 may break things */
 #ifdef DEBUG
 	if (skb->len > dev->mtu) {
@@ -145,13 +151,14 @@ __dbg_static inline void sw_skb_xmit(struct sk_buff *skb, struct net_device *dev
 /* if the packet data is used by someone else
    we make a copy before altering it 
  */
-__dbg_static void sw_skb_unshare(struct sk_buff **skb) {
+static void sw_skb_unshare(struct sk_buff **skb)
+{
 	struct sk_buff *skb2;
 
 	if (atomic_read(&skb_shinfo(*skb)->dataref)) {
 		dbg("%s: expanding skb=%p\n", __func__, *skb);
 		skb2 = skb_copy_expand(*skb, ETH_HLEN+VLAN_TAG_BYTES, 0, GFP_ATOMIC);
-		/* FIXME skb2 can return NULL if it fails */
+		BUG_ON(!skb2);
 
 		/* Fix ip_summed stuff (also see "BUG ALERT" at bottom of
 		 * skb_copy_expand() comment)
@@ -167,9 +174,9 @@ __dbg_static void sw_skb_unshare(struct sk_buff **skb) {
 /* Forward frame from in port to out port,
    adding/removing vlan tag if necessary.
  */
-__dbg_static void __sw_forward(struct net_switch_port *in, struct net_switch_port *out, 
-	struct sk_buff *skb, struct skb_extra *skb_e) {
-
+static void __sw_forward(struct net_switch_port *in, struct net_switch_port *out,
+	struct sk_buff *skb, struct skb_extra *skb_e)
+{
 	dbg("%s: forwarding frame to %s; ip_summed=%d\n", __func__,
 			out->dev->name, (int)skb->ip_summed);
 	if (out->flags & SW_PFL_TRUNK && !(in->flags & SW_PFL_TRUNK)) {
@@ -185,172 +192,67 @@ __dbg_static void __sw_forward(struct net_switch_port *in, struct net_switch_por
 	sw_skb_xmit(skb, out->dev, PACKET_HOST);
 }
 
+struct sw_flood_context {
+	struct net_switch_port *in;
+	int vlan;
+	int pkt_type;
+	struct sk_buff *skb;
+	struct list_head *lh1;
+	struct list_head *lh2;
+	struct net_device *(*netdev)(struct list_head *);
+	int (*valid)(struct list_head *, struct list_head *,
+			struct sw_flood_context *);
+	void *priv;
 #ifdef DEBUG
-#define __sw_flood_inc_cloned cloned++
-#define __sw_flood_inc_copied copied++
-#define __sw_flood_inc_unshared unshared++
+	int copied, cloned, unshared;
+#endif
+};
+
+#ifdef DEBUG
+#define __sw_flood_inc_cloned ctx->cloned++
+#define __sw_flood_inc_copied ctx->copied++
+#define __sw_flood_inc_unshared ctx->unshared++
 #else
 #define __sw_flood_inc_cloned
 #define __sw_flood_inc_copied
 #define __sw_flood_inc_unshared
 #endif
-__dbg_static int __sw_flood(struct net_switch *sw, struct net_switch_port *in,
-	struct sk_buff *skb, int vlan, void (*f)(struct sk_buff *, int),
-	struct list_head *lh1, struct list_head *lh2) {
-#ifdef DEBUG
-	int cloned = 0, copied = 0, unshared = 0;
-#endif
-	
-	struct net_switch_vdb_link *link, *prev=NULL, *oldprev;
-	struct sk_buff *skb2;
-	int needs_tag_change = 1;
-	int ret = 0;
 
-	list_for_each_entry_rcu(link, lh1, lh) {
-		if (link->port == in) continue;
-		if (prev) {
-			__sw_flood_inc_cloned;
-			skb2 = skb_clone(skb, GFP_ATOMIC);
-			sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
-			ret++;
-			skb = skb2;
-		}
-		prev = link;
-	}
-	oldprev = prev;
-	list_for_each_entry_rcu(link, lh2, lh) {
-		if (link->port == in) continue;
-		if (oldprev && prev == oldprev) {
-			/* 1 or more elements in lh1 && and we're at the first element
-			   in lh2; make a copy of the skb, then send the last skb from
-			   lh1
-			 */
-			__sw_flood_inc_copied;
-			skb2 = skb_copy_expand(skb, ETH_HLEN+VLAN_TAG_BYTES, 0, GFP_ATOMIC);
-			f(skb2, vlan);
-			needs_tag_change = 0;
-			sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
-			ret++;
-			skb = skb2;
-			prev = link;
-			continue;
-		}
-		if (prev) {
-			if (needs_tag_change) {
-				/* 0 elements in lh1, and we're at the 2nd element in lh2;
-				   make sure skb is an exclusive copy and apply the tag
-				   change to it before it gets cloned and sent
-				 */
-				__sw_flood_inc_unshared;
-				sw_skb_unshare(&skb);
-				f(skb, vlan);
-				needs_tag_change = 0;
-			}
-			__sw_flood_inc_cloned;
-			skb2 = skb_clone(skb, GFP_ATOMIC);
+static int __sw_flood(struct sw_flood_context *ctx)
+{
+	struct list_head *entry, *prev=NULL, *oldprev;
+	struct sk_buff *skb, *skb2;
+	int needs_tag_change = 1, ret = 0;
+	void (*vlan_op)(struct sk_buff *, int);
 
-			sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
-			ret++;
-			skb = skb2;
-		}
-		prev = link;
-	}
-	if (prev) {
-		if (needs_tag_change && prev != oldprev) {
-			/* lh2 is not empty, so the remaining element is from lh2,
-			   but the tag change was not applied
-			 */
-			__sw_flood_inc_unshared;
-			sw_skb_unshare(&skb);
-			f(skb, vlan);
-		}	
-		sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
-		ret++;
-	}
-	else {
-		dbg("flood: nothing to flood, freeing skb.\n");
-		dev_kfree_skb(skb);
-	}
-	dbg("__sw_flood: cloned=%d copied=%d unshared=%d\n", cloned, copied,
-			unshared);
-	return ret;
-}
+	vlan_op = ctx->in->flags & SW_PFL_TRUNK ? __strip_vlan_tag : add_vlan_tag;
+	skb = ctx->skb;
 
-/* Walk a fdb bucket and send a packet to all ports that match a
-   given mac address. This is used with multicast destination macs,
-   which are never dynamically learnt.
-
-   This function uses exactly the same "packet change optimization" (when
-   sending to multiple ports, the packet is changed at most once i.e. a
-   vlan tag is stripped or added) as __sw_flood above.
-
-   For better performance, I prefered to copy the whole function/algorithm
-   instead of making it more abstract. This means that changes to the algorithm
-   should be made in parallel (both in __sw_flood and __sw_multicast). And if
-   one of them is buggy, then most probably the other one is too :P
- */
-__dbg_static int __sw_multicast(struct net_switch *sw, struct net_switch_port *in,
-	struct sk_buff *skb, int vlan, void (*f)(struct sk_buff *, int),
-	struct list_head *fdb_entry_lh, int first_trunkness) {
-#ifdef DEBUG
-	int cloned = 0, copied = 0, unshared = 0;
-#endif
-	
-	struct net_switch_fdb_entry *entry, *prev=NULL, *oldprev;
-	struct sk_buff *skb2;
-	int needs_tag_change = 1;
-	int ret = 0;
-
-	list_for_each_entry_rcu(entry, fdb_entry_lh, lh) {
-		/* First check trunkness, so that we don't compare macs both
-		   now and the second time we walk the list
-		 */
-		if ((entry->port->flags & SW_PFL_TRUNK) != first_trunkness)
-			continue;
-		if (entry->vlan != vlan)
-			continue;
-		if (entry->port == in) continue;
-		if (memcmp(entry->mac, skb_mac_header(skb), ETH_ALEN))
-			continue;
-		/* In __sw_flood we use the vdb, so we know for sure that 'vlan' is
-		   allowed on the output port. But here we walk the fdb, so we need
-		   to additionally check if 'vlan' is allowed on the output port.
-		 */
-		if ((first_trunkness && sw_port_forbidden_vlan(entry->port, vlan)) ||
-				(!first_trunkness && entry->port->vlan != vlan))
+	__list_for_each_rcu(entry, ctx->lh1) {
+		if (!ctx->valid(entry, ctx->lh1, ctx))
 			continue;
 		if (prev) {
 			__sw_flood_inc_cloned;
 			skb2 = skb_clone(skb, GFP_ATOMIC);
-			/* FIXME: PACKET_MULTICAST */
-			sw_skb_xmit(skb, prev->port->dev, PACKET_MULTICAST);
+			sw_skb_xmit(skb, ctx->netdev(prev), ctx->pkt_type);
 			ret++;
 			skb = skb2;
 		}
 		prev = entry;
 	}
 	oldprev = prev;
-	list_for_each_entry_rcu(entry, fdb_entry_lh, lh) {
-		if ((entry->port->flags & SW_PFL_TRUNK) == first_trunkness)
-			continue;
-		if (entry->vlan != vlan)
-			continue;
-		if (entry->port == in) continue;
-		if (memcmp(entry->mac, skb_mac_header(skb), ETH_ALEN))
-			continue;
-		if ((first_trunkness && sw_port_forbidden_vlan(entry->port, vlan)) ||
-				(!first_trunkness && entry->port->vlan != vlan))
+	__list_for_each_rcu(entry, ctx->lh2) {
+		if (!ctx->valid(entry, ctx->lh2, ctx))
 			continue;
 		if (oldprev && prev == oldprev) {
 			/* 1 or more elements in lh1 && and we're at the first element
 			   in lh2; make a copy of the skb, then send the last skb from
-			   lh1
-			 */
+			   lh1 */
 			__sw_flood_inc_copied;
 			skb2 = skb_copy_expand(skb, ETH_HLEN+VLAN_TAG_BYTES, 0, GFP_ATOMIC);
-			f(skb2, vlan);
+			vlan_op(skb2, ctx->vlan);
 			needs_tag_change = 0;
-			sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
+			sw_skb_xmit(skb, ctx->netdev(prev), ctx->pkt_type);
 			ret++;
 			skb = skb2;
 			prev = entry;
@@ -360,17 +262,15 @@ __dbg_static int __sw_multicast(struct net_switch *sw, struct net_switch_port *i
 			if (needs_tag_change) {
 				/* 0 elements in lh1, and we're at the 2nd element in lh2;
 				   make sure skb is an exclusive copy and apply the tag
-				   change to it before it gets cloned and sent
-				 */
+				   change to it before it gets cloned and sent */
 				__sw_flood_inc_unshared;
 				sw_skb_unshare(&skb);
-				f(skb, vlan);
+				vlan_op(skb, ctx->vlan);
 				needs_tag_change = 0;
 			}
 			__sw_flood_inc_cloned;
 			skb2 = skb_clone(skb, GFP_ATOMIC);
-
-			sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
+			sw_skb_xmit(skb, ctx->netdev(prev), ctx->pkt_type);
 			ret++;
 			skb = skb2;
 		}
@@ -379,54 +279,198 @@ __dbg_static int __sw_multicast(struct net_switch *sw, struct net_switch_port *i
 	if (prev) {
 		if (needs_tag_change && prev != oldprev) {
 			/* lh2 is not empty, so the remaining element is from lh2,
-			   but the tag change was not applied
-			 */
+			   but the tag change was not applied */
 			__sw_flood_inc_unshared;
 			sw_skb_unshare(&skb);
-			f(skb, vlan);
-		}	
-		sw_skb_xmit(skb, prev->port->dev, PACKET_BROADCAST);
+			vlan_op(skb, ctx->vlan);
+		}
+		sw_skb_xmit(skb, ctx->netdev(prev), ctx->pkt_type);
 		ret++;
 	}
 	else {
-		dbg("multicast: no ports, you don't want to free the skb!.\n");
-		/* Don't free the skb this time like we do in sw_flood, because
-		   the packet won't be dropped. Instead it will be flooded to all
-		   ports later in sw_forward().
-		 */
+		dbg("%s: freeing skb\n", __func__);
+		dev_kfree_skb(skb);
 	}
-	dbg("__sw_multicast: cloned=%d copied=%d unshared=%d\n", cloned, copied,
-			unshared);
 	return ret;
 }
+
 #undef __sw_flood_inc_cloned
 #undef __sw_flood_inc_copied
 #undef __sw_flood_inc_unshared
 
+static struct net_device *sw_fdb_entry_to_netdev(struct list_head *l)
+{
+	struct net_switch_fdb_entry *entry;
+
+	entry = list_entry(l, struct net_switch_fdb_entry, lh);
+	return entry->port->dev;
+}
+
+static int sw_group_fdb_entry_valid(struct list_head *curr, struct list_head *head,
+		struct sw_flood_context *ctx)
+{
+	struct net_switch_fdb_entry *entry;
+	int first_trunkness;
+	unsigned char *mc_vmac;
+
+	entry = list_entry(curr, struct net_switch_fdb_entry, lh);
+	first_trunkness = ctx->in->flags & SW_PFL_TRUNK;
+	mc_vmac = (unsigned char *)ctx->priv;
+
+	if (entry->port == ctx->in)
+		return 0;
+	if (head == ctx->lh1 && (entry->port->flags & SW_PFL_TRUNK) != first_trunkness)
+		return 0;
+	if (head == ctx->lh2 && (entry->port->flags & SW_PFL_TRUNK) == first_trunkness)
+		return 0;
+	if (entry->vlan != ctx->vlan)
+		return 0;
+	if (memcmp(entry->mac, mc_vmac, ETH_ALEN))
+		return 0;
+	/* In sw_flood we use the vdb, so we know for sure that 'vlan' is
+	   allowed on the output port. But here we walk the fdb, so we need
+	   to additionally check if 'vlan' is allowed on the output port. */
+	if ((first_trunkness && sw_port_forbidden_vlan(entry->port, ctx->vlan)) ||
+			(!first_trunkness && entry->port->vlan != ctx->vlan))
+		return 0;
+	return 1;
+}
+
+static int sw_flood_group(struct net_switch *sw, struct net_switch_port *in,
+		struct sk_buff *skb, int vlan)
+{
+	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(skb_mac_header(skb))];
+	unsigned char mc_vmac[ETH_ALEN] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
+	struct sw_flood_context ctx;
+	int ret;
+
+	/* Build the multicast group virtual MAC */
+	*(__be32 *)(&mc_vmac[2]) = ip_hdr(skb)->daddr;
+	/* Lookup in FDB to select the bucket */
+	bucket = &sw->fdb[sw_mac_hash(mc_vmac)];
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.in = in;
+	ctx.vlan = vlan;
+	ctx.pkt_type = PACKET_MULTICAST;
+	ctx.skb = skb;
+	ctx.lh1 = &bucket->entries;
+	ctx.lh2 = &bucket->entries;
+	ctx.netdev = sw_fdb_entry_to_netdev;
+	ctx.valid = sw_group_fdb_entry_valid;
+	ctx.priv = &mc_vmac[0];
+
+	ret = __sw_flood(&ctx);
+
+	dbg("%s: cloned=%d copied=%d unshared=%d\n", __func__, ctx.cloned, ctx.copied,
+			ctx.unshared);
+	return ret;
+}
+
+static struct net_device *sw_vdb_link_to_netdev(struct list_head *l)
+{
+	struct net_switch_vdb_link *entry;
+
+	entry = list_entry(l, struct net_switch_vdb_link, lh);
+	return entry->port->dev;
+}
+
+static int sw_flood_mrouters_valid(struct list_head *curr, struct list_head *head,
+		struct sw_flood_context *ctx)
+{
+	struct net_switch_vdb_link *link;
+
+	link = list_entry(curr, struct net_switch_vdb_link, lh);
+	if (link->port == ctx->in)
+		return 0;
+	return sw_is_mrouter(link->port->mrouters, ctx->vlan);
+}
+
+static int sw_flood_mrouters(struct net_switch *sw, struct net_switch_port *in,
+		struct sk_buff *skb, int vlan)
+{
+	struct sw_flood_context ctx;
+	int ret;
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.in = in;
+	ctx.vlan = vlan;
+	ctx.pkt_type = PACKET_MULTICAST;
+	ctx.skb = skb;
+	ctx.netdev = sw_vdb_link_to_netdev;
+	ctx.valid = sw_flood_mrouters_valid;
+
+	/* if source port is in trunk mode we first send the
+	   socket buffer to all trunk ports in that vlan then
+	   strip vlan tag and send to all non-trunk ports in that vlan
+	 */
+	if (in->flags & SW_PFL_TRUNK) {
+		ctx.lh1 = &sw->vdb[vlan]->trunk_ports;
+		ctx.lh2 = &sw->vdb[vlan]->non_trunk_ports;
+	}
+	else {
+	/* otherwise we send the frame to all non-trunk ports in that vlan
+	   then add a vlan tag to it and send it to all trunk ports in that vlan.
+	 */
+		ctx.lh1 = &sw->vdb[vlan]->non_trunk_ports;
+		ctx.lh2 = &sw->vdb[vlan]->trunk_ports;
+	}
+
+	ret = __sw_flood(&ctx);
+
+	dbg("%s: cloned=%d copied=%d unshared=%d\n", __func__, ctx.cloned, ctx.copied,
+			ctx.unshared);
+	return ret;
+}
+
+static int sw_flood_valid(struct list_head *curr, struct list_head *head,
+		struct sw_flood_context *ctx)
+{
+	struct net_switch_vdb_link *link;
+
+	link = list_entry(curr, struct net_switch_vdb_link, lh);
+	return (link->port != ctx->in);
+}
+
 /* Flood frame to all necessary ports */
-__dbg_static int sw_flood(struct net_switch *sw, struct net_switch_port *in,
+static int sw_flood(struct net_switch *sw, struct net_switch_port *in,
 		struct sk_buff *skb, int vlan) {
+	struct sw_flood_context ctx;
+	int ret;
+
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.in = in;
+	ctx.vlan = vlan;
+	ctx.pkt_type = PACKET_BROADCAST;
+	ctx.skb = skb;
+	ctx.netdev = sw_vdb_link_to_netdev;
+	ctx.valid = sw_flood_valid;
 
 	/* if source port is in trunk mode we first send the 
 	   socket buffer to all trunk ports in that vlan then
 	   strip vlan tag and send to all non-trunk ports in that vlan 
 	 */
 	if (in->flags & SW_PFL_TRUNK) {
-		return __sw_flood(sw, in, skb, vlan, __strip_vlan_tag,
-				&sw->vdb[vlan]->trunk_ports,
-				&sw->vdb[vlan]->non_trunk_ports);
+		ctx.lh1 = &sw->vdb[vlan]->trunk_ports;
+		ctx.lh2 = &sw->vdb[vlan]->non_trunk_ports;
 	}
 	else {
 	/* otherwise we send the frame to all non-trunk ports in that vlan 
 	   then add a vlan tag to it and send it to all trunk ports in that vlan.
 	 */
-		return __sw_flood(sw, in, skb, vlan, add_vlan_tag,
-				&sw->vdb[vlan]->non_trunk_ports,
-				&sw->vdb[vlan]->trunk_ports);
+		ctx.lh1 = &sw->vdb[vlan]->non_trunk_ports;
+		ctx.lh2 = &sw->vdb[vlan]->trunk_ports;
 	}
+
+	ret = __sw_flood(&ctx);
+
+	dbg("%s: cloned=%d copied=%d unshared=%d\n", __func__, ctx.cloned, ctx.copied,
+			ctx.unshared);
+	return ret;
 }	
 
-int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e) {
+static int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e)
+{
 	struct net_switch *sw = (skb->dev->sw_port)? skb->dev->sw_port->sw:
 		((struct net_switch_vif_priv *)netdev_priv(skb->dev))->bogo_port.sw;
 	unsigned char *vif_mac = sw->vif_mac;
@@ -448,11 +492,52 @@ int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e) {
 	return 0;
 }
 
+static int sw_multicast(struct net_switch *sw, struct net_switch_port *in,
+		struct sk_buff *skb, struct skb_extra *skb_e)
+{
+	unsigned char mc_vmac[ETH_ALEN] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
+	struct net_switch_port *port;
+
+	/* if IGMP snooping is disabled we need to flood the frame */
+	if (!sw->igmp_snooping || !sw->vdb[skb_e->vlan]->igmp_snooping)
+		return sw_flood(sw, in, skb, skb_e->vlan);
+
+	/* IGMP membership report: create group and forward to mrouters */
+	if (eth_hdr(skb)->h_proto == ETH_P_IP && ip_hdr(skb)->protocol == IPPROTO_IGMP &&
+			igmp_hdr(skb)->type == IGMPV2_HOST_MEMBERSHIP_REPORT) {
+		if (!sw_is_mrouter(in->mrouters, skb_e->vlan)) {
+			list_for_each_entry(port, &sw->ports, lh) {
+				if (sw_is_mrouter(port->mrouters, skb_e->vlan))
+					goto fdb_igmp_learn;
+			}
+			dev_kfree_skb(skb);
+			return 0;
+		}
+fdb_igmp_learn:
+		/* Add the multicast group virtual MAC in the FDB */
+		*(__be32 *)(&mc_vmac[2]) = igmp_hdr(skb)->group;
+		fdb_learn(mc_vmac, in, skb_e->vlan, SW_FDB_IGMP_DYNAMIC);
+		return sw_flood_mrouters(sw, in, skb, skb_e->vlan);
+	}
+
+	/* Normal multicast traffic */
+	if (!sw_is_mrouter(in->mrouters, skb_e->vlan)) {
+		list_for_each_entry(port, &sw->ports, lh) {
+			if (sw_is_mrouter(port->mrouters, skb_e->vlan))
+				return sw_flood_mrouters(sw, in, skb, skb_e->vlan);
+		}
+		return sw_flood(sw, in, skb, skb_e->vlan);
+	}
+	/* forward to multicast group members from the FDB */
+	return sw_flood_group(sw, in, skb, skb_e->vlan);
+}
+
 /* Forwarding decision
    Returns the number of ports the packet was forwarded to.
  */
 int sw_forward(struct net_switch_port *in,
-		struct sk_buff *skb, struct skb_extra *skb_e) {
+		struct sk_buff *skb, struct skb_extra *skb_e)
+{
 	struct net_switch *sw = in->sw;
 	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(skb_mac_header(skb))];
 	struct net_switch_fdb_entry *out;
@@ -463,13 +548,8 @@ int sw_forward(struct net_switch_port *in,
 		return ret;
 	rcu_read_lock();
 	if (is_mcast_mac(skb_mac_header(skb))) {
-		ret = __sw_multicast(sw, in, skb, skb_e->vlan,
-				in->flags & SW_PFL_TRUNK ? __strip_vlan_tag : add_vlan_tag,
-				&bucket->entries, in->flags & SW_PFL_TRUNK);
+		ret = sw_multicast(sw, in, skb, skb_e);
 		rcu_read_unlock();
-		if(ret)
-			return ret;
-		ret = sw_flood(sw, in, skb, skb_e->vlan);
 		return ret;
 	}
 	if (fdb_lookup(bucket, skb_mac_header(skb), skb_e->vlan, &out)) {
