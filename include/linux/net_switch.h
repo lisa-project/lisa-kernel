@@ -232,7 +232,7 @@ enum {
 #define SW_MAX_PORT_DESC	31
 
 #define is_mcast_mac(ptr) \
-	((ptr)[0] == 0x01 && (ptr)[1] == 0x00 && (ptr)[2] == 0x5e)
+	((ptr)[0] == 0x01 && (ptr)[1] == 0x00 && (ptr)[2] == 0x5e && (ptr[3] < 0x80))
 #define is_l2_mac(ptr) \
 	((ptr)[0] == 0x01 && (ptr)[1] == 0x80 && (ptr)[2] == 0xc2)
 #define is_null_mac(ptr) \

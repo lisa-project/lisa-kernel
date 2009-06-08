@@ -38,9 +38,10 @@ int sw_vdb_add_vlan(struct net_switch *sw, int vlan, char *name) {
 		return -ENOMEM;
 	}
 	strncpy(entry->name, name, SW_MAX_VLAN_NAME);
-    entry->name[SW_MAX_VLAN_NAME] = '\0';
-    INIT_LIST_HEAD(&entry->trunk_ports);
-    INIT_LIST_HEAD(&entry->non_trunk_ports);
+	entry->name[SW_MAX_VLAN_NAME] = '\0';
+	entry->igmp_snooping = sw->igmp_snooping;
+	INIT_LIST_HEAD(&entry->trunk_ports);
+	INIT_LIST_HEAD(&entry->non_trunk_ports);
 	rcu_assign_pointer(sw->vdb[vlan], entry);
 
 	/* Add all switched ports to this vlan, if it is configured
