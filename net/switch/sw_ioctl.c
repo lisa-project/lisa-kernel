@@ -446,7 +446,6 @@ static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 	int vlan = arg->vlan;
 
 	list_for_each_entry_rcu(entry, &sw.fdb[hash_pos].entries, lh) {
-		/* FIXME: do we need to filter out IGMP membership entries here? */
 		if (cmp_mac && memcmp(arg->ext.mac.addr, entry->mac, ETH_ALEN))
 			continue;
 		if (vlan && vlan != entry->vlan)
@@ -592,8 +591,6 @@ int sw_getmrouters(struct swcfgreq *arg)
 
 	list_for_each_entry(port, &sw.ports, lh) {
 		tmp.ifindex = port->dev->ifindex;
-		if(!port->mrouters)
-			continue;
 		for(i = 0; i < SW_VLAN_BMP_NO; i++) {
 			if(!port->mrouters[i])
 				continue;

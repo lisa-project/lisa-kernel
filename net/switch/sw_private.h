@@ -28,10 +28,8 @@
 
 #ifdef DEBUG
 #define dbg(text,par...) printk(KERN_DEBUG text, ##par)
-#define __dbg_static
 #else
 #define dbg(par...)
-#define __dbg_static static
 #endif
 #define SW_HASH_SIZE_BITS 12
 #define SW_HASH_SIZE (1 << SW_HASH_SIZE_BITS)
@@ -52,6 +50,7 @@ struct net_switch_bucket {
 
 struct net_switch_vdb_entry {
 	char *name;
+	unsigned char igmp_snooping;
 	struct list_head trunk_ports;
 	struct list_head non_trunk_ports;
 };
@@ -120,6 +119,9 @@ struct net_switch {
 
 	/* Template for virtual interfaces mac */
 	unsigned char vif_mac[ETH_ALEN];
+
+	/* Global IGMP snooping enable flag */
+	unsigned char igmp_snooping;
 };
 
 
