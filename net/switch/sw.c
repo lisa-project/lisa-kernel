@@ -124,7 +124,7 @@ static int sw_netdev_event(struct notifier_block *nb, unsigned long event, void 
       Otherwise (on zero return value) the packet will be processed by
 	  upper layers. This is used for routed switch ports.
  */
-__dbg_static int sw_handle_frame(struct net_switch_port *port,
+static int sw_handle_frame(struct net_switch_port *port,
 		struct sk_buff **pskb, int *ret) {
 	struct sk_buff *skb = *pskb;
 	struct skb_extra skb_e;
@@ -259,7 +259,8 @@ static void init_switch(struct net_switch *sw, const unsigned char *vif_mac) {
 		INIT_LIST_HEAD(&sw->vif[i]);
 	}
 	memcpy(sw->vif_mac, vif_mac, 6);
-	atomic_set(&sw->fdb_age_time, SW_DEFAULT_AGE_TIME * HZ); 
+	atomic_set(&sw->fdb_age_time, SW_DEFAULT_AGE_TIME * HZ);
+	sw->igmp_snooping = 1;
 	sw_fdb_init(sw);
 	init_switch_proc();
 	sw_vdb_init(sw);
