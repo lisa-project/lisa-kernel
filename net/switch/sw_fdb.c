@@ -88,7 +88,7 @@ int fdb_cleanup_port(struct net_switch_port *port, int entry_type) {
 	
 	for (i = 0; i < SW_HASH_SIZE; i++) {
 		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
-			if(entry->port == port && (entry_type == SW_FDB_ANY || entry->type == entry_type))
+			if(entry->port == port && fdb_entry_match(entry->type, entry_type))
                 break;
 		}
         if(&entry->lh == &sw->fdb[i].entries)
@@ -96,7 +96,7 @@ int fdb_cleanup_port(struct net_switch_port *port, int entry_type) {
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(entry->port == port && (entry_type == SW_FDB_ANY || entry->type == entry_type)) {
+			if(entry->port == port && fdb_entry_match(entry->type, entry_type)) {
 				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
@@ -124,7 +124,7 @@ int fdb_cleanup_by_type(struct net_switch *sw, int entry_type) {
 	for (i = 0; i < SW_HASH_SIZE; i++) {
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(entry_type == SW_FDB_ANY || entry->type == entry_type) {
+			if (fdb_entry_match(entry->type, entry_type)) {
 				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
@@ -160,7 +160,7 @@ int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int entry_type) {
 	
 	for (i = 0; i < SW_HASH_SIZE; i++) {
 		list_for_each_entry_rcu(entry, &sw->fdb[i].entries, lh) {
-			if(entry->vlan == vlan && (entry_type == SW_FDB_ANY || entry->type == entry_type))
+			if (entry->vlan == vlan && fdb_entry_match(entry->type, entry_type))
                 break;
 		}
         if(&entry->lh == &sw->fdb[i].entries)
@@ -168,7 +168,7 @@ int fdb_cleanup_vlan(struct net_switch *sw, int vlan, int entry_type) {
         /* We found entries; lock for write and delete them */
         spin_lock_bh(&sw->fdb[i].lock);
 		list_for_each_entry_safe(entry, tmp, &sw->fdb[i].entries, lh) {
-			if(entry->vlan == vlan && (entry_type == SW_FDB_ANY || entry->type == entry_type)) {
+			if (entry->vlan == vlan && fdb_entry_match(entry->type, entry_type)) {
 				if (!(entry->type & SW_FDB_STATIC))
 					del_timer(&entry->age_timer);
                 list_del_rcu(&entry->lh);
@@ -206,7 +206,7 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 
 	list_for_each_entry_rcu(entry, &bucket->entries, lh) {
 		if((!vlan || entry->vlan == vlan) && (!port || entry->port == port) &&
-				(entry_type = SW_FDB_ANY || entry->type == entry_type) &&
+				fdb_entry_match(entry->type, entry_type) &&
 				!memcmp(entry->mac, mac, ETH_ALEN))
 			break;
 	}
@@ -216,7 +216,7 @@ int fdb_del(struct net_switch *sw, unsigned char *mac,
 	spin_lock_bh(&bucket->lock);
 	list_for_each_entry_safe(entry, tmp, &bucket->entries, lh) {
 		if((!vlan || entry->vlan == vlan) && (!port || entry->port == port) &&
-				(entry_type = SW_FDB_ANY || entry->type == entry_type) &&
+				fdb_entry_match(entry->type, entry_type) &&
 				!memcmp(entry->mac, mac, ETH_ALEN)) {
 			if (!(entry->type & SW_FDB_STATIC))
 				del_timer(&entry->age_timer);
@@ -255,6 +255,11 @@ int fdb_lookup(struct net_switch_bucket *bucket, unsigned char *mac,
 	return 0;
 }
 
+/* FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+ * we should check for overlapping between multicast group virtual
+ * mac and regular mac addresses
+ * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
+ */
 static inline int __fdb_learn(struct net_switch_bucket *bucket,
 		unsigned char *mac, struct net_switch_port *port, int vlan,
 		struct net_switch_fdb_entry **pentry) {
