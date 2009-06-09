@@ -108,6 +108,7 @@ int sw_vdb_del_vlan(struct net_switch *sw, int vlan) {
 	 */
 	rcu_assign_pointer(sw->vdb[vlan], NULL);
 	synchronize_sched();
+	/* FIXME what about igmp pseudo-entries? */
 	fdb_cleanup_vlan(sw, vlan, SW_FDB_ANY);
 
 	/* Subsequent invocations of the forwarding code will "see" this
