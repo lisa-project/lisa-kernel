@@ -327,6 +327,8 @@ static int sw_group_fdb_entry_valid(struct list_head *curr, struct list_head *he
 		return 0;
 	if (memcmp(entry->mac, mc_vmac, ETH_ALEN))
 		return 0;
+	if (!(entry->type & SW_FDB_IGMP))
+		return 0;
 	/* In sw_flood we use the vdb, so we know for sure that 'vlan' is
 	   allowed on the output port. But here we walk the fdb, so we need
 	   to additionally check if 'vlan' is allowed on the output port. */
@@ -492,30 +494,57 @@ static int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e)
 	return 0;
 }
 
+static inline short sw_eth_hproto(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	return ntohs(*(__be16 *)(skb_mac_header(skb) + (skb_e->has_vlan_tag ? 14 : 12)));
+}
+
+static inline struct iphdr *sw_ip_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	return (struct iphdr *)(skb_mac_header(skb) + 14 + (skb_e->has_vlan_tag ? 2 : 0));
+}
+
+static inline struct igmphdr *sw_igmp_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	struct iphdr *iph = sw_ip_hdr(skb, skb_e);
+	return (struct igmphdr *)((unsigned char *)iph + iph->ihl * 4);
+}
+
 static int sw_multicast(struct net_switch *sw, struct net_switch_port *in,
 		struct sk_buff *skb, struct skb_extra *skb_e)
 {
 	unsigned char mc_vmac[ETH_ALEN] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
 	struct net_switch_port *port;
 
+	dbg("%s: vlan=%d eth=%x (%x) ip=%x (%x) igmp=%x (%x)\n", __func__,
+			skb_e->vlan,
+			sw_eth_hproto(skb, skb_e), ETH_P_IP,
+			sw_ip_hdr(skb, skb_e)->protocol, IPPROTO_IGMP,
+			sw_igmp_hdr(skb, skb_e)->type, IGMPV2_HOST_MEMBERSHIP_REPORT);
+	dbg("%s: skb->data=%p mac_header=%p network_header=%p transport_header=%p\n",
+			__func__, skb->data,
+			skb_mac_header(skb), skb_network_header(skb), skb_transport_header(skb));
+
 	/* if IGMP snooping is disabled we need to flood the frame */
 	if (!sw->igmp_snooping || !sw->vdb[skb_e->vlan]->igmp_snooping)
 		return sw_flood(sw, in, skb, skb_e->vlan);
 
 	/* IGMP membership report: create group and forward to mrouters */
-	if (eth_hdr(skb)->h_proto == ETH_P_IP && ip_hdr(skb)->protocol == IPPROTO_IGMP &&
-			igmp_hdr(skb)->type == IGMPV2_HOST_MEMBERSHIP_REPORT) {
+	if (sw_eth_hproto(skb, skb_e) == ETH_P_IP && sw_ip_hdr(skb, skb_e)->protocol == IPPROTO_IGMP &&
+			sw_igmp_hdr(skb, skb_e)->type == IGMPV2_HOST_MEMBERSHIP_REPORT) {
 		if (!sw_is_mrouter(in->mrouters, skb_e->vlan)) {
 			list_for_each_entry(port, &sw->ports, lh) {
 				if (sw_is_mrouter(port->mrouters, skb_e->vlan))
 					goto fdb_igmp_learn;
 			}
+			dbg("%s: port is not mrouter and no other mrouter found\n", __func__);
 			dev_kfree_skb(skb);
 			return 0;
 		}
 fdb_igmp_learn:
 		/* Add the multicast group virtual MAC in the FDB */
-		*(__be32 *)(&mc_vmac[2]) = igmp_hdr(skb)->group;
+		dbg("%s: learning group address\n", __func__);
+		*(__be32 *)(&mc_vmac[2]) = sw_igmp_hdr(skb, skb_e)->group;
 		fdb_learn(mc_vmac, in, skb_e->vlan, SW_FDB_IGMP_DYNAMIC);
 		return sw_flood_mrouters(sw, in, skb, skb_e->vlan);
 	}
