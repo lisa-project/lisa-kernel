@@ -157,7 +157,7 @@ struct net_switch_vdb_link {
 struct net_switch_fdb_entry {
 	struct list_head lh;
 	unsigned char mac[ETH_ALEN];
-	int type;
+	unsigned char type;
 	int vlan;
 	struct net_switch_port *port;
 	struct net_switch_bucket *bucket;
@@ -193,6 +193,8 @@ static __inline__ int sw_mac_hash(const unsigned char *mac) {
 static __inline__ int sw_vlan_hash(const int vlan) {
 	return vlan % SW_VIF_HASH_SIZE; 
 }
+
+#define fdb_entry_match(entry_type, mask_value) (((entry_type) & ((mask_value) >> 8)) == ((mask_value) & 0xff))
 
 /* sw.c */
 extern void dump_packet(const struct sk_buff *);

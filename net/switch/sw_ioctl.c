@@ -182,6 +182,10 @@ static inline void __sw_add_to_vlans(struct net_switch_port *port) {
 
 /* Set a port's trunk mode and make appropriate changes to the
    vlan database.
+   FIXME for fdb_cleanup_port()
+   1. what about igmp pseudo-fdb entries?
+   2. what about static macs?
+   3. what about macs on access vlan?
  */
 static int sw_set_port_trunk(struct net_switch_port *port, int trunk) {
 	int status;
@@ -252,6 +256,11 @@ static int sw_set_port_access(struct net_switch_port *port, int access) {
 	return 0;
 }
 
+/* FIXME for fdb_cleanup_port()
+   1. what about igmp pseudo-fdb entries?
+   2. what about static macs?
+   3. what about macs on access vlan?
+ */
 static int sw_set_switchport(struct net_switch_port *port, int switchport) {
 	int status;
 
@@ -452,7 +461,7 @@ static int sw_get_mac_loop(int hash_pos, struct swcfgreq *arg,
 			continue;
 		if (port && port != entry->port)
 			continue;
-		if (arg->ext.mac.type != SW_FDB_ANY && arg->ext.mac.type != entry->type)
+		if (!fdb_entry_match(entry->type, arg->ext.mac.type))
 			continue;
 		if (len + sizeof(struct net_switch_mac) > arg->buf.size) {
 			dbg("sw_get_mac_loop: insufficient buffer space\n");
@@ -749,7 +758,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = -EINVAL;
 			break;
 		}
-		err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_STATIC) ? 0 : -ENOENT;
+		err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_MAC_STATIC) ? 0 : -ENOENT;
 		break;
 	case SWCFG_ADDVIF:
 		err = sw_vif_addif(&sw, arg.vlan, &rdev);
