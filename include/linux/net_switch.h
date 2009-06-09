@@ -110,7 +110,7 @@ struct net_switch_ifcfg {
  */
 struct net_switch_mac {
 	unsigned char addr[ETH_ALEN];
-	int type;
+	unsigned char type;
 	int vlan;
 	int ifindex;
 };
@@ -183,14 +183,27 @@ struct swcfgreq {
 /* FDB entry type flags */
 #define SW_FDB_STATIC 0x01
 #define SW_FDB_IGMP   0x02
-#define SW_FDB_ANY    0xFF
 
-/* Possible types of FDB entries. */
+/* Possible types of FDB entries.
+ *
+ * For granular selection of fdb entry types, both a mask and a check
+ * value are needed. For each entry, the entry type is bitwise-anded
+ * with the mask and the result is tested against the check value.
+ *
+ * For ease of use, both the mask and check value are combined into a
+ * single int. Since entry type is unsigned char, 8 bits are required
+ * for mask and check value. When combined into an int, mask is shifted
+ * left by 8 bits.
+ */
 enum {
-	SW_FDB_MAC_DYNAMIC,
-	SW_FDB_MAC_STATIC = SW_FDB_STATIC,
-	SW_FDB_IGMP_DYNAMIC = SW_FDB_IGMP,
-	SW_FDB_IGMP_STATIC = SW_FDB_IGMP | SW_FDB_STATIC,
+	/*                      Mask									Value */
+	SW_FDB_ANY = 0,
+	SW_FDB_MAC_ANY =		(SW_FDB_IGMP << 8) 						| 0x00,
+	SW_FDB_MAC_STATIC =		((SW_FDB_IGMP | SW_FDB_STATIC) << 8)	| SW_FDB_STATIC,
+	SW_FDB_MAC_DYNAMIC =	((SW_FDB_IGMP | SW_FDB_STATIC) << 8)	| 0x00,
+	SW_FDB_IGMP_ANY =		(SW_FDB_IGMP << 8)						| SW_FDB_IGMP,
+	SW_FDB_IGMP_STATIC =	((SW_FDB_IGMP | SW_FDB_STATIC) << 8)	| SW_FDB_IGMP | SW_FDB_STATIC,
+	SW_FDB_IGMP_DYNAMIC =	((SW_FDB_IGMP | SW_FDB_STATIC) << 8)	| SW_FDB_IGMP
 };
 
 /* Minimum number a vlan may have */
