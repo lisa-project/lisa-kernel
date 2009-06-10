@@ -20,6 +20,22 @@
 #include <linux/ip.h>
 #include <linux/igmp.h>
 
+static inline short sw_eth_hproto(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	return ntohs(*(__be16 *)(skb_mac_header(skb) + (skb_e->has_vlan_tag ? 14 : 12)));
+}
+
+static inline struct iphdr *sw_ip_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	return (struct iphdr *)(skb_mac_header(skb) + 14 + (skb_e->has_vlan_tag ? 2 : 0));
+}
+
+static inline struct igmphdr *sw_igmp_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
+{
+	struct iphdr *iph = sw_ip_hdr(skb, skb_e);
+	return (struct igmphdr *)((unsigned char *)iph + iph->ihl * 4);
+}
+
 static __inline__ void add_vlan_tag(struct sk_buff *skb, int vlan)
 {
 	int nhead = (ETH_HLEN + VLAN_TAG_BYTES) - (skb->data - skb->head);
@@ -200,7 +216,7 @@ struct sw_flood_context {
 	struct list_head *lh1;
 	struct list_head *lh2;
 	struct net_device *(*netdev)(struct list_head *);
-	int (*valid)(struct list_head *, struct list_head *,
+	int (*valid)(struct list_head *, int,
 			struct sw_flood_context *);
 	void *priv;
 #ifdef DEBUG
@@ -229,7 +245,7 @@ static int __sw_flood(struct sw_flood_context *ctx)
 	skb = ctx->skb;
 
 	__list_for_each_rcu(entry, ctx->lh1) {
-		if (!ctx->valid(entry, ctx->lh1, ctx))
+		if (!ctx->valid(entry, 1, ctx))
 			continue;
 		if (prev) {
 			__sw_flood_inc_cloned;
@@ -242,7 +258,7 @@ static int __sw_flood(struct sw_flood_context *ctx)
 	}
 	oldprev = prev;
 	__list_for_each_rcu(entry, ctx->lh2) {
-		if (!ctx->valid(entry, ctx->lh2, ctx))
+		if (!ctx->valid(entry, 2, ctx))
 			continue;
 		if (oldprev && prev == oldprev) {
 			/* 1 or more elements in lh1 && and we're at the first element
@@ -306,7 +322,7 @@ static struct net_device *sw_fdb_entry_to_netdev(struct list_head *l)
 	return entry->port->dev;
 }
 
-static int sw_group_fdb_entry_valid(struct list_head *curr, struct list_head *head,
+static int sw_group_fdb_entry_valid(struct list_head *curr, int stage,
 		struct sw_flood_context *ctx)
 {
 	struct net_switch_fdb_entry *entry;
@@ -319,9 +335,9 @@ static int sw_group_fdb_entry_valid(struct list_head *curr, struct list_head *he
 
 	if (entry->port == ctx->in)
 		return 0;
-	if (head == ctx->lh1 && (entry->port->flags & SW_PFL_TRUNK) != first_trunkness)
+	if (stage == 1 && (entry->port->flags & SW_PFL_TRUNK) != first_trunkness)
 		return 0;
-	if (head == ctx->lh2 && (entry->port->flags & SW_PFL_TRUNK) == first_trunkness)
+	if (stage == 2 && (entry->port->flags & SW_PFL_TRUNK) == first_trunkness)
 		return 0;
 	if (entry->vlan != ctx->vlan)
 		return 0;
@@ -339,7 +355,7 @@ static int sw_group_fdb_entry_valid(struct list_head *curr, struct list_head *he
 }
 
 static int sw_flood_group(struct net_switch *sw, struct net_switch_port *in,
-		struct sk_buff *skb, int vlan)
+		struct sk_buff *skb, struct skb_extra *skb_e)
 {
 	struct net_switch_bucket *bucket = &sw->fdb[sw_mac_hash(skb_mac_header(skb))];
 	unsigned char mc_vmac[ETH_ALEN] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -347,13 +363,13 @@ static int sw_flood_group(struct net_switch *sw, struct net_switch_port *in,
 	int ret;
 
 	/* Build the multicast group virtual MAC */
-	*(__be32 *)(&mc_vmac[2]) = ip_hdr(skb)->daddr;
+	*(__be32 *)(&mc_vmac[2]) = sw_ip_hdr(skb, skb_e)->daddr;
 	/* Lookup in FDB to select the bucket */
 	bucket = &sw->fdb[sw_mac_hash(mc_vmac)];
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.in = in;
-	ctx.vlan = vlan;
+	ctx.vlan = skb_e->vlan;
 	ctx.pkt_type = PACKET_MULTICAST;
 	ctx.skb = skb;
 	ctx.lh1 = &bucket->entries;
@@ -377,7 +393,7 @@ static struct net_device *sw_vdb_link_to_netdev(struct list_head *l)
 	return entry->port->dev;
 }
 
-static int sw_flood_mrouters_valid(struct list_head *curr, struct list_head *head,
+static int sw_flood_mrouters_valid(struct list_head *curr, int stage,
 		struct sw_flood_context *ctx)
 {
 	struct net_switch_vdb_link *link;
@@ -425,7 +441,7 @@ static int sw_flood_mrouters(struct net_switch *sw, struct net_switch_port *in,
 	return ret;
 }
 
-static int sw_flood_valid(struct list_head *curr, struct list_head *head,
+static int sw_flood_valid(struct list_head *curr, int stage,
 		struct sw_flood_context *ctx)
 {
 	struct net_switch_vdb_link *link;
@@ -494,22 +510,6 @@ static int sw_vif_forward(struct sk_buff *skb, struct skb_extra *skb_e)
 	return 0;
 }
 
-static inline short sw_eth_hproto(const struct sk_buff *skb, const struct skb_extra *skb_e)
-{
-	return ntohs(*(__be16 *)(skb_mac_header(skb) + (skb_e->has_vlan_tag ? 14 : 12)));
-}
-
-static inline struct iphdr *sw_ip_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
-{
-	return (struct iphdr *)(skb_mac_header(skb) + 14 + (skb_e->has_vlan_tag ? 2 : 0));
-}
-
-static inline struct igmphdr *sw_igmp_hdr(const struct sk_buff *skb, const struct skb_extra *skb_e)
-{
-	struct iphdr *iph = sw_ip_hdr(skb, skb_e);
-	return (struct igmphdr *)((unsigned char *)iph + iph->ihl * 4);
-}
-
 static int sw_multicast(struct net_switch *sw, struct net_switch_port *in,
 		struct sk_buff *skb, struct skb_extra *skb_e)
 {
@@ -558,7 +558,7 @@ fdb_igmp_learn:
 		return sw_flood(sw, in, skb, skb_e->vlan);
 	}
 	/* forward to multicast group members from the FDB */
-	return sw_flood_group(sw, in, skb, skb_e->vlan);
+	return sw_flood_group(sw, in, skb, skb_e);
 }
 
 /* Forwarding decision
