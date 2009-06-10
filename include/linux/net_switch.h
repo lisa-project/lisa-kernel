@@ -45,7 +45,7 @@ enum {
 	SWCFG_ADDTRUNKVLANS,	/* add ports to the bitmap of forbidden trunk ports */
 	SWCFG_DELTRUNKVLANS,	/* remove ports from the bitmap of forbidden trunk ports */
 	SWCFG_SETTRUNKVLANS,	/* set the bitmap of forbidden trunk ports */
-	SWCFG_ADDMROUTER,		/* set a port as mrouter on a vlan  */
+	SWCFG_SETMROUTER,		/* set a port as mrouter on a vlan  */
 	SWCFG_GETMROUTERS,		/* get a list of mrouters */
 
 	/* FDB manipulation */
@@ -170,6 +170,7 @@ struct swcfgreq {
 			int type;
 		} mac;
 		int switchport;
+		int mrouter;
 	} ext;
 
 	/* Userspace supplied buffer for dumping large data such as
