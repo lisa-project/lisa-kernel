@@ -802,9 +802,13 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		sw_res_port_flag(port, SW_PFL_ADMDISABLED);
 		sw_enable_port(port);
 		break;
-	case SWCFG_ADDMROUTER:
+	case SWCFG_SETMROUTER:
 		PORT_GET;
-		err = sw_set_mrouter(port->mrouters, arg.vlan);
+		if (arg.ext.mrouter)
+			sw_set_mrouter(port->mrouters, arg.vlan);
+		else
+			sw_reset_mrouter(port->mrouters, arg.vlan);
+		err = 0;
 		break;
 	case SWCFG_SETTRUNKVLANS:
 		PORT_GET;
