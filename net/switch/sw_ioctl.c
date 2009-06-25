@@ -943,6 +943,25 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	case SWCFG_GETMROUTERS:
 		err = sw_getmrouters(&arg);
 		break;
+	case SWCFG_SETIGMPS:
+		err = 0;
+		if(arg.vlan == 0){
+			/*global igmp flag*/
+			int i;
+			sw.igmp_snooping = arg.ext.snooping;
+			for(i=SW_MIN_VLAN; i<=SW_MAX_VLAN; i++)
+				if(sw.vdb[i])
+					sw.vdb[i]->igmp_snooping = arg.ext.snooping;
+			break;
+		}
+		/*per vlan igmp flag*/
+		if(sw_vdb_vlan_exists(&sw, arg.vlan))
+			sw.vdb[arg.vlan]->igmp_snooping = arg.ext.snooping;
+		else
+			err = -EINVAL;
+		break;
+	case SWCFG_GETIGMPS:
+	break;
 	}
 
 	if (do_put)

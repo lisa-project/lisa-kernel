@@ -45,8 +45,10 @@ enum {
 	SWCFG_ADDTRUNKVLANS,	/* add ports to the bitmap of forbidden trunk ports */
 	SWCFG_DELTRUNKVLANS,	/* remove ports from the bitmap of forbidden trunk ports */
 	SWCFG_SETTRUNKVLANS,	/* set the bitmap of forbidden trunk ports */
-	SWCFG_SETMROUTER,		/* set a port as mrouter on a vlan  */
-	SWCFG_GETMROUTERS,		/* get a list of mrouters */
+	SWCFG_SETMROUTER,	/* set a port as mrouter on a vlan  */
+	SWCFG_GETMROUTERS,	/* get a list of mrouters */
+	SWCFG_SETIGMPS,		/* enable/disable igmp snooping on switch or vlan */
+	SWCFG_GETIGMPS,		/* igmp snooping on switch or vlan */
 
 	/* FDB manipulation */
 	SWCFG_GETMAC,			/* fetch mac addresses from the fdb */
@@ -171,6 +173,7 @@ struct swcfgreq {
 		} mac;
 		int switchport;
 		int mrouter;
+		int snooping;
 	} ext;
 
 	/* Userspace supplied buffer for dumping large data such as
