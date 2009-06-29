@@ -548,6 +548,8 @@ int sw_getvlanif(struct swcfgreq *arg)
 		return -ENOENT;
 
 	list_for_each_entry(link, &sw.vdb[arg->vlan]->non_trunk_ports, lh) {
+		if (sw_is_vif(link->port->dev))
+			continue;
 		ifindex = link->port->dev->ifindex;
 		push_to_user_buf(ifindex, arg, size);
 	}
