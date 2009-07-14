@@ -3,6 +3,14 @@ obj-$(CONFIG_SWITCH) += switch.o
 switch-objs := sw.o sw_fdb.o sw_proc.o sw_vdb.o sw_forward.o sw_ioctl.o sw_vif.o sw_socket.o
 
 ##
+# LiSA kernel api version
+##
+
+LISA_KAPI_MAJOR = 2
+LISA_KAPI_MINOR = 0
+LISA_KAPI_PATCH = 1
+
+##
 # Config section; will be moved to kernel config
 ##
 
