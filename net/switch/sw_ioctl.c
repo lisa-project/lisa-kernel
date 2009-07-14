@@ -963,7 +963,30 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = -EINVAL;
 		break;
 	case SWCFG_GETIGMPS:
-	break;
+		err = 0;
+		arg.ext.snooping = sw.igmp_snooping;
+		if (arg.buf.addr) {
+			unsigned char map[SW_VLAN_BMP_NO];
+			int i;
+
+			memset(map, 0, sizeof(map));
+			for (i = SW_MIN_VLAN; i <= SW_MAX_VLAN; i++) {
+				if (!sw.vdb[i])
+					continue;
+				/* set bits for vlans with *disabled* igmp; this way
+				 * userspace config builder will know that (a) vlan
+				 * exists and (b) vlan has igmp snooping disabled */
+				if (!sw.vdb[i]->igmp_snooping)
+					sw_bitmap_set(map, i);
+			}
+			if (copy_to_user(arg.buf.addr, map, sizeof(map))) {
+				err = -EFAULT;
+				break;
+			}
+		}
+		if (copy_to_user(uarg, &arg, sizeof(arg)))
+			err = -EFAULT;
+		break;
 	}
 
 	if (do_put)
