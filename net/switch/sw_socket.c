@@ -132,6 +132,18 @@ int sw_socket_filter(struct sk_buff *skb, struct net_switch_port *port) {
 	int handled = 0;
 	struct switch_sock *sw_sk; 
 
+	/* RSTP frames can be identified by having both the DSAP and SSAP fields
+	 * equal to 0x42. The Control field must also equal 0x03.
+	 * The multicast address is 01:80:C2:00:00:00 */
+	if (skb->data[0] == 0x42 && skb->data[1] == 0x42 && skb->data[2] == 0x03) {
+		dbg("Identified RSTP frame on %s\n", port->dev->name);
+		list_for_each_entry_rcu(sw_sk, &port->sock_rstp, port_chain) {
+			atomic_inc(&skb->users);
+			handled |= sw_socket_enqueue(skb, port->dev, sw_sk);
+		}
+		goto out;
+	}
+
 	/* First identify SNAP frames. See specs/ether_frame_formats.html for
 	 * details */
 	if(skb->len >= port->dev->mtu || skb->data[0] != 0xaa)
@@ -228,6 +240,9 @@ static int bind_switch_port(struct switch_sock *sws, struct net_switch_port *por
 	switch(proto) {
 	case ETH_P_CDP:
 		lh = &port->sock_cdp;
+		break;
+	case ETH_P_RSTP:
+		lh = &port->sock_rstp;
 		break;
 	/* FIXME: here we should handle other protocols as well */
 	default:

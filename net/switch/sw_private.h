@@ -84,6 +84,7 @@ struct net_switch_port {
 	/* List heads for switch sockets */
 	struct list_head sock_cdp;
 	struct list_head sock_vtp;
+	struct list_head sock_rstp;
 };
 
 struct net_switch_vif_priv {

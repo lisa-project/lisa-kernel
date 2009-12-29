@@ -90,6 +90,7 @@ static int sw_addif(struct net_device *dev) {
 	port->flags = SW_PFL_DISABLED;
 	INIT_LIST_HEAD(&port->sock_cdp);
 	INIT_LIST_HEAD(&port->sock_vtp);
+	INIT_LIST_HEAD(&port->sock_rstp);
 #ifdef NET_SWITCH_TRUNKDEFAULTVLANS
 	memset(port->forbidden_vlans, 0xff, SW_VLAN_BMP_NO);
 	__sw_allow_default_vlans(port->forbidden_vlans);
