@@ -192,8 +192,6 @@ int init_switch_proc(void) {
 	if (!switch_dir)
 		return -ENOMEM;
 
-	switch_dir->owner = THIS_MODULE;
-
 	/*
 	   Create the ifaces file, which lists information
 	   about the interfaces added to switch
@@ -204,7 +202,6 @@ int init_switch_proc(void) {
 		proc_net_remove(&init_net, SW_PROCFS_DIR);
 		return -ENOMEM;
 	}
-	iface_file->owner = THIS_MODULE;
 
 	mac_file = create_proc_read_entry(SW_PROCFS_MAC, 0644,
 			switch_dir, proc_read_mac, NULL);
@@ -213,7 +210,6 @@ int init_switch_proc(void) {
 		proc_net_remove(&init_net, SW_PROCFS_DIR);
 		return -ENOMEM;
 	}
-	mac_file->owner = THIS_MODULE;
 	
 	vlan_file = create_proc_read_entry(SW_PROCFS_VLAN, 0644,
 			switch_dir, proc_read_vlan, NULL);
@@ -223,7 +219,6 @@ int init_switch_proc(void) {
 		proc_net_remove(&init_net, SW_PROCFS_DIR);
 		return -ENOMEM;
 	}
-	vlan_file->owner = THIS_MODULE;
 
 	vif_file = create_proc_read_entry(SW_PROCFS_VIF, 0644,
 			switch_dir, proc_read_vif, NULL);

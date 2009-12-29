@@ -62,23 +62,12 @@ int sw_vif_hard_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	return 0;
 }
 
-void sw_vif_tx_timeout(struct net_device *dev) {
-}
-
 struct net_device_stats * sw_vif_get_stats(struct net_device *dev) {
 	struct net_switch_vif_priv *priv = netdev_priv(dev);
 	return &priv->stats;
 }
 
-int sw_vif_set_config(struct net_device *dev, struct ifmap *map) {
-	return 0;
-}
-
-int sw_vif_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd) {
-	return 0;
-}
-
-static struct ethtool_ops vif_ethtool_ops = {
+static struct ethtool_ops sw_vif_ethtool_ops = {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
@@ -86,6 +75,13 @@ static struct ethtool_ops vif_ethtool_ops = {
 	.get_tso = ethtool_op_get_tso,
 	.set_tso = ethtool_op_set_tso,
 	.get_link = ethtool_op_get_link,
+};
+
+static struct net_device_ops sw_vif_netdev_ops = {
+	.ndo_open = sw_vif_open,
+	.ndo_stop = sw_vif_stop,
+	.ndo_start_xmit = sw_vif_hard_start_xmit,
+	.ndo_get_stats = sw_vif_get_stats,
 };
 
 int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
@@ -115,15 +111,9 @@ int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
 	dev->dev_addr[ETH_ALEN - 2] ^= vlan / 0x100;
 	dev->dev_addr[ETH_ALEN - 1] ^= vlan % 0x100;
 
-	dev->open = sw_vif_open;
-	dev->stop = sw_vif_stop;
-	dev->set_config = sw_vif_set_config;
-	dev->hard_start_xmit = sw_vif_hard_start_xmit;
-	dev->do_ioctl = sw_vif_do_ioctl;
-	dev->get_stats = sw_vif_get_stats;
-	dev->tx_timeout = sw_vif_tx_timeout;
+	dev->netdev_ops = &sw_vif_netdev_ops;
 	dev->watchdog_timeo = HZ;
-	SET_ETHTOOL_OPS(dev, &vif_ethtool_ops);
+	SET_ETHTOOL_OPS(dev, &sw_vif_ethtool_ops);
 	
 	priv = netdev_priv(dev);
 	INIT_LIST_HEAD(&priv->bogo_port.lh); /* paranoid */
@@ -205,5 +195,5 @@ void sw_vif_cleanup(struct net_switch *sw) {
 
 int sw_is_vif(struct net_device *dev)
 {
-	return dev->open == sw_vif_open;
+	return dev->netdev_ops->ndo_open == sw_vif_open;
 }
