@@ -27,7 +27,7 @@ CFGFLAGS += -DNET_SWITCH_NOVLANFORIF=1
 CFGFLAGS += -DSW_SOCK_FILTER_PARANOIA
 
 # Enable debugging
-CFGFLAGS += -DDEBUG -g
+#CFGFLAGS += -DDEBUG -g
 
 ##
 # End of config section
