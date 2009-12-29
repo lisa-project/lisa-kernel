@@ -93,8 +93,7 @@ static int sw_socket_enqueue(struct sk_buff *skb, struct net_device *dev, struct
 
 	skb_set_owner_r(skb, sk);
 	skb->dev = NULL;
-	dst_release(skb->dst);
-	skb->dst = NULL;
+	skb_dst_drop(skb);
 
 	nf_reset(skb);
 
