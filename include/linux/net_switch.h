@@ -266,7 +266,7 @@ enum {
  */
 #define ETH_P_CDP	0x0020
 #define ETH_P_VTP	0x0021
-#define ETH_P_STP	0x0022
+#define ETH_P_RSTP	0x0022
 
 struct sockaddr_sw {
 	unsigned short			ssw_family;
