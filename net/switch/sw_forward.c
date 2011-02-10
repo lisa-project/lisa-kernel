@@ -88,10 +88,10 @@ static __inline__ void add_vlan_tag(struct sk_buff *skb, int vlan)
 	 * software to avoid trouble.
 	 */
 	if (skb->ip_summed == CHECKSUM_PARTIAL && skb->protocol == htons(ETH_P_IP)) {
-		dbg("%s: fixing ip checksum (muie xen)\n", __func__);
+		dbg("%s: applying xen ip checksum fix\n", __func__);
 		skb->csum_start -= ETH_HLEN;
 		/* skb->h.raw = skb->head + skb->csum_start; */
-		skb_set_transport_header(skb->csum_start - skb_headroom(skb));
+		skb_set_transport_header(skb, skb->csum_start - skb_headroom(skb));
 		skb_checksum_help(skb);
 		/* skb_checksum_help() sets skb->ip_summed to CHECKSUM_NONE */
 		skb->csum = 0;
