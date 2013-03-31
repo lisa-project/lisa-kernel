@@ -32,7 +32,6 @@ enum {
 	/* VDB manipulation */
 	SWCFG_ADDVLAN,			/* add vlan to vlan database */
 	SWCFG_DELVLAN,			/* delete vlan from vlan database */
-	SWCFG_RENAMEVLAN,		/* rename vlan from vlan database */
 	SWCFG_GETVDB,			/* copy the whole vlan database to userspace */
 	SWCFG_GETVLANIFS,		/* get a list of interfaces in a specific vlan */
 

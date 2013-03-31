@@ -127,31 +127,6 @@ int sw_vdb_del_vlan(struct net_switch *sw, int vlan) {
 	return 0;
 }
 
-/* Rename a vlan */
-int sw_vdb_set_vlan_name(struct net_switch *sw, int vlan, char *name) {
-	struct net_switch_vdb_entry *entry;
-	char *entry_name, *old_name;
-
-    if(sw_invalid_vlan(vlan))
-        return -EINVAL;
-    if(!(entry = sw->vdb[vlan]))
-        return -ENOENT;
-	if(sw_is_default_vlan(vlan))
-		return -EPERM;
-    if(!(entry_name = kmalloc(SW_MAX_VLAN_NAME + 1, GFP_ATOMIC))) {
-        dbg("Out of memory while trying to change vlan name%d\n", vlan);
-        return -ENOMEM;
-    }
-	strncpy(entry_name, name, SW_MAX_VLAN_NAME);
-    entry_name[SW_MAX_VLAN_NAME] = '\0';
-	old_name = entry->name;
-	rcu_assign_pointer(entry->name, entry_name);
-	synchronize_sched();
-	kfree(old_name);
-
-	return 0;
-}
-
 /* Initialize the vlan database */
 void sw_vdb_init(struct net_switch *sw) {
 	memset(&sw->vdb, 0, sizeof(sw->vdb));

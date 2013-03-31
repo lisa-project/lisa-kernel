@@ -220,7 +220,6 @@ extern void sw_fdb_exit(struct net_switch *);
 extern int sw_vdb_add_vlan(struct net_switch *, int, char *);
 extern int sw_vdb_add_vlan_default(struct net_switch *, int);
 extern int sw_vdb_del_vlan(struct net_switch *, int);
-extern int sw_vdb_set_vlan_name(struct net_switch *, int, char *);
 extern void sw_vdb_init(struct net_switch *);
 extern void sw_vdb_exit(struct net_switch *);
 extern int sw_vdb_add_port(int, struct net_switch_port *);
