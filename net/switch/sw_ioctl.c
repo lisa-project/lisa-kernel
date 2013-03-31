@@ -676,12 +676,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		err = sw_delif(dev);
 		break;
 	case SWCFG_ADDVLAN:
-		if (!strncpy_from_user(vlan_desc, arg.ext.vlan_desc, SW_MAX_VLAN_NAME)) {
-			err = -EFAULT;
-			break;
-		}
-		vlan_desc[SW_MAX_VLAN_NAME] = '\0';
-		err = sw_vdb_add_vlan(&sw, arg.vlan, vlan_desc);
+		err = sw_vdb_add_vlan(&sw, arg.vlan);
 		break;
 	case SWCFG_DELVLAN:
 		if (sw_is_default_vlan(arg.vlan)) {

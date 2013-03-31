@@ -19,26 +19,21 @@
 #include "sw_private.h"
 
 /* Add a new vlan to the vlan database */
-int sw_vdb_add_vlan(struct net_switch *sw, int vlan, char *name) {
+int sw_vdb_add_vlan(struct net_switch *sw, int vlan) {
 	struct net_switch_vdb_entry *entry;
 	struct net_switch_port *port;
 	struct net_device *dev;
 
-    if(sw_invalid_vlan(vlan))
-        return -EINVAL;
-    if(sw->vdb[vlan])
-        return -EEXIST;
-    if(!(entry = kmalloc(sizeof(struct net_switch_vdb_entry),
+	if(sw_invalid_vlan(vlan))
+		return -EINVAL;
+	if(sw->vdb[vlan])
+		return -EEXIST;
+	if(!(entry = kmalloc(sizeof(struct net_switch_vdb_entry),
 					GFP_ATOMIC))) {
-        dbg("Out of memory while trying to add vlan %d\n", vlan);
-        return -ENOMEM;
-    }
-	if(!(entry->name = kmalloc(SW_MAX_VLAN_NAME + 1, GFP_ATOMIC))) {
-		kfree(entry);
+		dbg("Out of memory while trying to add vlan %d\n", vlan);
 		return -ENOMEM;
 	}
-	strncpy(entry->name, name, SW_MAX_VLAN_NAME);
-	entry->name[SW_MAX_VLAN_NAME] = '\0';
+
 	entry->igmp_snooping = sw->igmp_snooping;
 	INIT_LIST_HEAD(&entry->trunk_ports);
 	INIT_LIST_HEAD(&entry->non_trunk_ports);
@@ -69,14 +64,12 @@ int sw_vdb_add_vlan(struct net_switch *sw, int vlan, char *name) {
 	return 0;
 }
 
-int sw_vdb_add_vlan_default(struct net_switch *sw, int vlan) {
-	char buf[9];
-	
-    if(sw_invalid_vlan(vlan))
-        return -EINVAL;
+int sw_vdb_add_vlan_default(struct net_switch *sw, int vlan)
+{
+	if(sw_invalid_vlan(vlan))
+		return -EINVAL;
 	/* TODO If we're vtp client, ignore this request and return */
-	sprintf(buf, "VLAN%04d", vlan);
-	return sw_vdb_add_vlan(sw, vlan, buf);
+	return sw_vdb_add_vlan(sw, vlan);
 }
 
 /* Remove a vlan from the vlan database */
@@ -133,11 +126,11 @@ void sw_vdb_init(struct net_switch *sw) {
 	sw->vdb_cache = KMEM_CACHE(net_switch_vdb_link, SLAB_HWCACHE_ALIGN);
 	if(!sw->vdb_cache)
 		return;
-    sw_vdb_add_vlan(sw, 1, "default");
-    sw_vdb_add_vlan(sw, 1002, "fddi-default");
-    sw_vdb_add_vlan(sw, 1003, "trcrf-default");
-    sw_vdb_add_vlan(sw, 1004, "fddinet-default");
-    sw_vdb_add_vlan(sw, 1005, "trbrf-default");
+    sw_vdb_add_vlan(sw, 1);
+    sw_vdb_add_vlan(sw, 1002);
+    sw_vdb_add_vlan(sw, 1003);
+    sw_vdb_add_vlan(sw, 1004);
+    sw_vdb_add_vlan(sw, 1005);
 }
 
 /* Destroy the vlan database */

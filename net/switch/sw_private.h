@@ -217,7 +217,7 @@ extern int fdb_lookup(struct net_switch_bucket *, unsigned char *,
 extern void sw_fdb_exit(struct net_switch *);
 
 /* sw_vdb.c */
-extern int sw_vdb_add_vlan(struct net_switch *, int, char *);
+extern int sw_vdb_add_vlan(struct net_switch *, int);
 extern int sw_vdb_add_vlan_default(struct net_switch *, int);
 extern int sw_vdb_del_vlan(struct net_switch *, int);
 extern void sw_vdb_init(struct net_switch *);
