@@ -49,7 +49,6 @@ struct net_switch_bucket {
 };
 
 struct net_switch_vdb_entry {
-	char *name;
 	unsigned char igmp_snooping;
 	struct list_head trunk_ports;
 	struct list_head non_trunk_ports;

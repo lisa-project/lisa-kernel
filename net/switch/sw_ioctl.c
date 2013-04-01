@@ -505,7 +505,7 @@ static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 	return ret;
 }
 
-int sw_get_vdb(struct swcfgreq *arg, int vlan_id, char *vlan_desc) {
+int sw_get_vdb(struct swcfgreq *arg, int vlan_id) {
 	int size = 0;
 	struct net_switch_vdb entry;
 	int vlan, min = SW_MIN_VLAN, max = SW_MAX_VLAN;
@@ -522,12 +522,8 @@ int sw_get_vdb(struct swcfgreq *arg, int vlan_id, char *vlan_desc) {
 			rcu_read_unlock();
 			continue;
 		}
-		if (vlan_desc && strcmp(vlan_desc, sw.vdb[vlan]->name)) {
-			rcu_read_unlock();
-			continue;
-		}
+
 		entry.vlan = vlan;
-		strcpy(entry.name, sw.vdb[vlan]->name);
 		rcu_read_unlock();
 		push_to_user_buf(entry, arg, size);
 	}
@@ -652,7 +648,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 	int err = -EINVAL;
 	int do_put = 0;
 	unsigned long age_time;
-	char vlan_desc[SW_MAX_VLAN_NAME+1];
 	struct net *net = &init_net;
 
 	if (cmd != SIOCSWCFG)
@@ -911,14 +906,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = fdb_cleanup_by_type(&sw, SW_FDB_MAC_DYNAMIC);
 		break;
 	case SWCFG_GETVDB:
-		if (arg.ext.vlan_desc != NULL &&
-				!strncpy_from_user(vlan_desc, arg.ext.vlan_desc, SW_MAX_VLAN_NAME)) {
-			err = -EFAULT;
-			break;
-		}
-		vlan_desc[SW_MAX_VLAN_NAME] = '\0';
-		err = sw_get_vdb(&arg, arg.vlan, arg.ext.vlan_desc == NULL ?
-				NULL : vlan_desc);
+		err = sw_get_vdb(&arg, arg.vlan);
 		break;
 	case SWCFG_SETSWPORT:
 		PORT_GET;

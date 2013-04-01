@@ -148,15 +148,15 @@ static int proc_read_vlan(char *page, char **start,
 	int len, vlan;
 	struct net_switch_vdb_link *link;
 	
-	len = sprintf(page, "VLAN Name                             Status    Ports\n");
-	len += sprintf(page+len, "---- -------------------------------- --------- "
+	len = sprintf(page, "VLAN Status    Ports\n");
+	len += sprintf(page+len, "---- --------- "
 		"-------------------------------\n");
 	
 	rcu_read_lock();
 
 	for (vlan = SW_MIN_VLAN; vlan <= SW_MAX_VLAN; vlan++) {
 		if (! sw.vdb[vlan]) continue;
-		len += sprintf(page+len, "%-4d %-32s active    ", vlan, sw.vdb[vlan]->name);
+		len += sprintf(page+len, "%-4d active    ", vlan);
 		/* FIXME: functie de listat porturile paginat */
 		list_for_each_entry(link, &sw.vdb[vlan]->trunk_ports, lh) {
 			len += sprintf(page+len,"%s ", link->port->dev->name);

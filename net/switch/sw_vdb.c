@@ -114,7 +114,6 @@ int sw_vdb_del_vlan(struct net_switch *sw, int vlan) {
 	list_for_each_entry_safe(link, tmp, &entry->non_trunk_ports, lh) {
 		kmem_cache_free(sw->vdb_cache, link);
 	}
-	kfree(entry->name);
 	kfree(entry);
 
 	return 0;
