@@ -123,7 +123,6 @@ int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
 	priv->bogo_port.vlan = vlan;
 	priv->bogo_port.forbidden_vlans = NULL;
 	priv->bogo_port.mrouters = NULL;
-	priv->bogo_port.desc[0] = '\0';
 	list_add_tail(&priv->lh, &sw->vif[sw_vlan_hash(vlan)]);
 	if ((result = register_netdev(dev))) {
 		dbg("vif: error %i registering netdevice %s\n", 

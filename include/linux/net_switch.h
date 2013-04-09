@@ -26,9 +26,6 @@ enum {
 	SWCFG_SETSWPORT,		/* set port type to switched (1) or routed (0) */
 	SWCFG_GETIFLIST,		/* get a list of all known interfaces */
 
-	/* Generic switched interface manipulation */
-	SWCFG_SETIFDESC,		/* set interface description */
-
 	/* VDB manipulation */
 	SWCFG_ADDVLAN,			/* add vlan to vlan database */
 	SWCFG_DELVLAN,			/* delete vlan from vlan database */

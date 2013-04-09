@@ -77,9 +77,6 @@ struct net_switch_port {
 	 */
 	unsigned char *mrouters;
 
-	/* Port description */
-	char desc[SW_MAX_PORT_DESC + 1];
-
 	/* List heads for switch sockets */
 	struct list_head sock_cdp;
 	struct list_head sock_vtp;

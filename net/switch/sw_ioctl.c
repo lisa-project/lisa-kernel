@@ -86,7 +86,6 @@ static int sw_addif(struct net_device *dev) {
 	port->dev = dev;
 	port->sw = &sw;
     port->vlan = 1; /* By default all ports are in vlan 1 */
-	port->desc[0] = '\0';
 	port->flags = SW_PFL_DISABLED;
 	INIT_LIST_HEAD(&port->sock_cdp);
 	INIT_LIST_HEAD(&port->sock_vtp);
@@ -819,16 +818,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		}
 		err = sw_del_port_forbidden_vlans(port, bitmap);
 		break;
-	case SWCFG_SETIFDESC:
-		PORT_GET;
-		if(!strncpy_from_user(port->desc, arg.ext.iface_desc,
-					SW_MAX_PORT_DESC)) {
-			err = -EFAULT;
-			break;
-		}
-		port->desc[SW_MAX_PORT_DESC] = '\0';
-		err = 0;
-		break;
 	case SWCFG_GETIFCFG:
 		PORT_GET;
 		arg.ext.cfg.flags = port->flags;
@@ -836,13 +825,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		if(arg.ext.cfg.forbidden_vlans != NULL) {
 			if(copy_to_user(arg.ext.cfg.forbidden_vlans,
 						port->forbidden_vlans, SW_VLAN_BMP_NO)) {
-				err = -EFAULT;
-				break;
-			}
-		}
-		if(arg.ext.cfg.description != NULL) {
-			if(copy_to_user(arg.ext.cfg.description, port->desc,
-						strlen(port->desc) + 1)) {
 				err = -EFAULT;
 				break;
 			}
