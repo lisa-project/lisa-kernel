@@ -504,16 +504,11 @@ static int sw_get_mac(struct swcfgreq *arg, struct net_switch_port *port) {
 	return ret;
 }
 
-int sw_get_vdb(struct swcfgreq *arg, int vlan_id) {
-	int size = 0;
-	struct net_switch_vdb entry;
+int sw_get_vdb(struct swcfgreq *arg ) {
 	int vlan, min = SW_MIN_VLAN, max = SW_MAX_VLAN;
+	unsigned char bitmap[SW_VLAN_BMP_NO];
 
-	if (vlan_id) {
-		if (sw_invalid_vlan(vlan_id))
-			return -EINVAL;
-		min = max = vlan_id;
-	}
+	memset(bitmap, 0X00, SW_VLAN_BMP_NO);
 
 	for(vlan = min; vlan <= max; vlan++) {
 		rcu_read_lock();
@@ -522,12 +517,15 @@ int sw_get_vdb(struct swcfgreq *arg, int vlan_id) {
 			continue;
 		}
 
-		entry.vlan = vlan;
 		rcu_read_unlock();
-		push_to_user_buf(entry, arg, size);
+
+		sw_forbid_vlan(bitmap, vlan);
 	}
 
-	return size;
+	if (copy_to_user((arg)->buf.addr, bitmap, (arg)->buf.size))
+		return -EFAULT;
+
+	return 0;
 }
 
 int sw_getvlanif(struct swcfgreq *arg)
@@ -888,7 +886,7 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 			err = fdb_cleanup_by_type(&sw, SW_FDB_MAC_DYNAMIC);
 		break;
 	case SWCFG_GETVDB:
-		err = sw_get_vdb(&arg, arg.vlan);
+		err = sw_get_vdb(&arg);
 		break;
 	case SWCFG_SETSWPORT:
 		PORT_GET;
