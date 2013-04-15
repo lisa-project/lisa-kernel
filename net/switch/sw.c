@@ -67,6 +67,20 @@ void dump_packet(const struct sk_buff *skb) {
 	printk("\n");
 }
 
+static bool sw_has_dev(struct net_device *dev)
+{
+	struct list_head *pos, *n;
+	struct net_switch_port *port;
+
+	/* Remove all interfaces from switch */
+	list_for_each_safe(pos, n, &sw.ports) {
+		port = list_entry(pos, struct net_switch_port, lh);
+		if (port == dev->sw_port)
+			return true;
+	}
+	return false;
+}
+
 static int sw_netdev_event(struct notifier_block *nb, unsigned long event, void *ptr);
 
 struct notifier_block sw_netdev_notifier = {
@@ -81,7 +95,7 @@ static int sw_netdev_event(struct notifier_block *nb, unsigned long event, void 
 	if (!dev)
 		return NOTIFY_DONE;
 
-	if (event == NETDEV_UNREGISTER) {
+	if (event == NETDEV_UNREGISTER && sw_has_dev(dev)) {
 		dbg("Received unregister event for net device %p\n", dev);
 		mutex_lock(&sw_ioctl_mutex);
 		sw_delif(dev);
