@@ -123,13 +123,6 @@ int sw_vdb_del_vlan(struct net_switch *sw, int vlan) {
 void sw_vdb_init(struct net_switch *sw) {
 	memset(&sw->vdb, 0, sizeof(sw->vdb));
 	sw->vdb_cache = KMEM_CACHE(net_switch_vdb_link, SLAB_HWCACHE_ALIGN);
-	if(!sw->vdb_cache)
-		return;
-    sw_vdb_add_vlan(sw, 1);
-    sw_vdb_add_vlan(sw, 1002);
-    sw_vdb_add_vlan(sw, 1003);
-    sw_vdb_add_vlan(sw, 1004);
-    sw_vdb_add_vlan(sw, 1005);
 }
 
 /* Destroy the vlan database */
