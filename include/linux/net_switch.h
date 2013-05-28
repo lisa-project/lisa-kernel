@@ -33,8 +33,6 @@ enum {
 	SWCFG_GETVLANIFS,		/* get a list of interfaces in a specific vlan */
 
 	/* Vlan-related switched interface manipulation */
-	SWCFG_ADDVLANPORT,		/* add a port to a vlan (trunk mode) */
-	SWCFG_DELVLANPORT ,		/* remove a port from a vlan (trunk mode) */
 	SWCFG_SETACCESS,		/* put a port in access mode */
 	SWCFG_SETTRUNK,			/* put a port in trunk mode */
 	SWCFG_SETPORTVLAN ,		/* add a port in a vlan (non-trunk mode) */

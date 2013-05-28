@@ -677,19 +677,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		}
 		err = sw_vdb_del_vlan(&sw, arg.vlan);
 		break;
-	case SWCFG_ADDVLANPORT:
-		DEV_GET;
-		sw_allow_vlan(bitmap, arg.vlan);
-		err = sw_add_port_forbidden_vlans(rcu_dereference(dev->sw_port), bitmap);
-		break;
-	case SWCFG_DELVLANPORT:
-		DEV_GET;
-		/* use sw_allow_vlan here because sw_del_port_forbidden_vlans
-		   negates the mask
-		 */
-		sw_allow_vlan(bitmap, arg.vlan);	
-		err = sw_del_port_forbidden_vlans(rcu_dereference(dev->sw_port), bitmap);
-		break;
 	case SWCFG_SETACCESS:
 		DEV_GET;
 		err = sw_set_port_access(rcu_dereference(dev->sw_port), arg.ext.access);
