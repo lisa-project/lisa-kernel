@@ -197,7 +197,7 @@ static int sw_set_port_trunk(struct net_switch_port *port, int trunk) {
 
 	if(port->flags & SW_PFL_TRUNK) {
 		if(trunk)
-			return -EEXIST;
+			return 0;
 		sw_set_port_flag_rcu(port, SW_PFL_DROPALL);
 		__sw_remove_from_vlans(port);
 		sw_res_port_flag(port, SW_PFL_TRUNK);
@@ -217,7 +217,7 @@ static int sw_set_port_trunk(struct net_switch_port *port, int trunk) {
 		sw_res_port_flag(port, SW_PFL_DROPALL);
 	} else {
 		if(!trunk)
-			return -EEXIST;
+			return 0;
 		sw_set_port_flag_rcu(port, SW_PFL_DROPALL);
 		sw_vdb_del_port(port->vlan, port);
 		sw_set_port_flag(port, SW_PFL_TRUNK);
