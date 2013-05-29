@@ -689,11 +689,6 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		DEV_GET;
 		err = sw_set_port_vlan(rcu_dereference(dev->sw_port), arg.vlan);	
 		break;
-	case SWCFG_CLEARMACINT:
-		PORT_GET;
-		fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
-		err = 0;
-		break;
 	case SWCFG_SETAGETIME:
 		/* FIXME use constants for arg.ext.nsec range */
 		if (arg.ext.nsec < 10 || arg.ext.nsec > 1000000) { 
@@ -859,18 +854,16 @@ int sw_deviceless_ioctl(struct socket *sock, unsigned int cmd, void __user *uarg
 		if (arg.ifindex) 
 			PORT_GET;
 	
-		if (port) {
+		if (port)
 			err = fdb_cleanup_port(port, SW_FDB_MAC_DYNAMIC);
-			break;
-		}	
-		if (arg.vlan) {
+		else if (arg.vlan)
 			err = fdb_cleanup_vlan(&sw, arg.vlan, SW_FDB_MAC_DYNAMIC);
-			break;
-		}
-		if (!is_null_mac(arg.ext.mac.addr))
+		else if (!is_null_mac(arg.ext.mac.addr))
 			err = fdb_del(&sw, arg.ext.mac.addr, port, arg.vlan, SW_FDB_MAC_DYNAMIC);
-		else 
+		else
 			err = fdb_cleanup_by_type(&sw, SW_FDB_MAC_DYNAMIC);
+
+		err = (err > 0)? 0 : -ENOENT;
 		break;
 	case SWCFG_GETVDB:
 		err = sw_get_vdb(&arg);

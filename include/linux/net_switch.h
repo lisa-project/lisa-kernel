@@ -48,7 +48,6 @@ enum {
 	SWCFG_GETMAC,			/* fetch mac addresses from the fdb */
 	SWCFG_GETAGETIME,		/* get fdb aging time interval */
 	SWCFG_SETAGETIME,		/* set fdb entry aging time interval (in ms) */
-	SWCFG_CLEARMACINT,		/* clear all macs for a given port */
 	SWCFG_MACSTATIC,		/* add static mac */
 	SWCFG_DELMACSTATIC,		/* delete static mac */
 	SWCFG_DELMACDYN,		/* clear dynamic mac addresses from the fdb */
