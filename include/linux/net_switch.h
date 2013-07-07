@@ -155,8 +155,6 @@ struct swcfgreq {
 		int trunk;
 		int nsec;
 		unsigned char *bmp;
-		char *vlan_desc;
-		char *iface_desc;
 		int speed;
 		int duplex;
 		struct net_switch_ifcfg cfg;
