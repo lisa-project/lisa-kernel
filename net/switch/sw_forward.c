@@ -244,7 +244,9 @@ static int __sw_flood(struct sw_flood_context *ctx)
 	vlan_op = ctx->in->flags & SW_PFL_TRUNK ? __strip_vlan_tag : add_vlan_tag;
 	skb = ctx->skb;
 
-	__list_for_each_rcu(entry, ctx->lh1) {
+	/* FIXME we should use RCU primitives for list traversal, but this only
+	 * matters on DEC Alpha */
+	list_for_each(entry, ctx->lh1) {
 		if (!ctx->valid(entry, 1, ctx))
 			continue;
 		if (prev) {
@@ -257,7 +259,9 @@ static int __sw_flood(struct sw_flood_context *ctx)
 		prev = entry;
 	}
 	oldprev = prev;
-	__list_for_each_rcu(entry, ctx->lh2) {
+	/* FIXME we should use RCU primitives for list traversal, but this only
+	 * matters on DEC Alpha */
+	list_for_each(entry, ctx->lh2) {
 		if (!ctx->valid(entry, 2, ctx))
 			continue;
 		if (oldprev && prev == oldprev) {

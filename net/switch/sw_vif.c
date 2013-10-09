@@ -67,6 +67,7 @@ struct net_device_stats * sw_vif_get_stats(struct net_device *dev) {
 	return &priv->stats;
 }
 
+#if 0
 static struct ethtool_ops sw_vif_ethtool_ops = {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
@@ -76,6 +77,7 @@ static struct ethtool_ops sw_vif_ethtool_ops = {
 	.set_tso = ethtool_op_set_tso,
 	.get_link = ethtool_op_get_link,
 };
+#endif
 
 static struct net_device_ops sw_vif_netdev_ops = {
 	.ndo_open = sw_vif_open,
@@ -113,7 +115,9 @@ int sw_vif_addif(struct net_switch *sw, int vlan, struct net_device **rdev)
 
 	dev->netdev_ops = &sw_vif_netdev_ops;
 	dev->watchdog_timeo = HZ;
+#if 0
 	SET_ETHTOOL_OPS(dev, &sw_vif_ethtool_ops);
+#endif
 	
 	priv = netdev_priv(dev);
 	INIT_LIST_HEAD(&priv->bogo_port.lh); /* paranoid */

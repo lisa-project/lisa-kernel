@@ -203,7 +203,7 @@ static struct proto switch_proto = {
 
 static const struct proto_ops sw_sock_ops;
 
-static int sw_sock_create(struct net *net, struct socket *sock, int protocol) {
+static int sw_sock_create(struct net *net, struct socket *sock, int protocol, int kern) {
 	struct sock *sk;
 	struct switch_sock *sws;
 
@@ -553,4 +553,6 @@ out:
 	return err;
 }
 
+#if 0
 MODULE_ALIAS_NETPROTO(PF_SWITCH);
+#endif
