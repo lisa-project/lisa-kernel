@@ -512,7 +512,7 @@ int sw_get_vdb(struct swcfgreq *arg ) {
 
 	for(vlan = min; vlan <= max; vlan++) {
 		rcu_read_lock();
-		if(sw.vdb[vlan] == NULL) {
+		if(sw.vdb[vlan]) {
 			rcu_read_unlock();
 			continue;
 		}
